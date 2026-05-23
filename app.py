@@ -3,8 +3,9 @@ import os
 import json
 import uuid
 import datetime
+import base64
 from pathlib import Path
-from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for
+from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, Response
 from werkzeug.utils import secure_filename
 import pandas as pd
 from grader import grade_exam, grade_exam_group_based
@@ -36,6 +37,27 @@ def _get_pw_browser():
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("FLASK_SECRET_KEY", "bousai-grader-2026")
+
+# ── Basic認証 ────────────────────────────────────────────────────────────────
+_BASIC_USER = os.environ.get("BASIC_AUTH_USERNAME", "admin")
+_BASIC_PASS = os.environ.get("BASIC_AUTH_PASSWORD", "password")
+
+@app.before_request
+def basic_auth():
+    auth = request.headers.get("Authorization", "")
+    if auth.startswith("Basic "):
+        try:
+            decoded = base64.b64decode(auth[6:]).decode("utf-8")
+            username, password = decoded.split(":", 1)
+            if username == _BASIC_USER and password == _BASIC_PASS:
+                return
+        except Exception:
+            pass
+    return Response(
+        "認証が必要です",
+        401,
+        {"WWW-Authenticate": 'Basic realm="中上級者認定テスト"'},
+    )
 
 def _mask_id(s):
     """ログインIDの中間部分をアスタリスクで伏字にする（先頭3文字＋末尾2文字を残す）"""
