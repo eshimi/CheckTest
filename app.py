@@ -54,9 +54,9 @@ def basic_auth():
         except Exception:
             pass
     return Response(
-        "認証が必要です",
+        "Authentication required",
         401,
-        {"WWW-Authenticate": 'Basic realm="中上級者認定テスト"'},
+        {"WWW-Authenticate": 'Basic realm="Login Required"'},
     )
 
 def _mask_id(s):
