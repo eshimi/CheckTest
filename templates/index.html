@@ -1,0 +1,692 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>採点開始 | 中上級者認定テスト</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link href="/static/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Noto Sans JP', sans-serif;
+      background: #f7f9fc;
+      color: #0f172a;
+      line-height: 1.6;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 0 32px;
+    }
+
+    /* ── Header ── */
+    header {
+      background: #ffffff;
+      border-bottom: 1px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header-inner {
+      height: 72px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      text-decoration: none;
+      color: #0f172a;
+    }
+    .logo-icon {
+      width: 38px;
+      height: 38px;
+      border: 2px solid #1a3a5c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1a3a5c;
+      font-weight: 900;
+      font-size: 18px;
+      border-radius: 6px;
+    }
+    .logo-text {
+      font-size: 20px;
+      font-weight: 800;
+      color: #1a3a5c;
+    }
+    nav { display: flex; gap: 36px; align-items: center; }
+    nav a {
+      text-decoration: none;
+      color: #64748b;
+      font-weight: 600;
+      font-size: 15px;
+      transition: color .2s;
+    }
+    nav a:hover { color: #1a3a5c; }
+    nav a.active { color: #1a3a5c; font-weight: 700; }
+
+    /* ── Hero ── */
+    .hero {
+      background: linear-gradient(90deg, #f8fbff 0%, #eef5ff 100%);
+    }
+    .hero-inner {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 28px 32px;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 32px;
+      align-items: center;
+      min-height: 240px;
+    }
+    .hero h1 {
+      font-size: 36px;
+      line-height: 1.2;
+      font-weight: 900;
+      margin-bottom: 10px;
+      letter-spacing: -1px;
+      color: #0f172a;
+    }
+    .hero-sub {
+      font-size: 14px;
+      color: #475569;
+      margin-bottom: 16px;
+    }
+    .hero-features {
+      display: flex;
+      gap: 16px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+    .feature { max-width: 150px; }
+    .feature-icon {
+      width: 32px;
+      height: 32px;
+      border-radius: 8px;
+      background: #eff6ff;
+      color: #1a3a5c;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      margin-bottom: 6px;
+    }
+    .feature h3 { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
+    .feature p { font-size: 12px; color: #64748b; margin: 0; }
+    .hero-button {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: linear-gradient(135deg, #1a3a5c, #0f2540);
+      color: #fff;
+      text-decoration: none;
+      padding: 10px 22px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      transition: .25s;
+      box-shadow: 0 6px 20px rgba(26,58,92,.2);
+      cursor: pointer;
+      border: none;
+    }
+    .hero-button:hover { transform: translateY(-2px); color: #fff; }
+    .hero-image img {
+      width: 100%;
+      height: 200px;
+      object-fit: cover;
+      border-radius: 16px;
+      box-shadow: 0 12px 40px rgba(15,23,42,.12);
+    }
+
+    /* ── Section / Cards ── */
+    .section { padding: 40px 0 60px; }
+    .card {
+      background: #fff;
+      border: 1px solid #e5e7eb;
+      border-radius: 20px;
+      padding: 32px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 20px rgba(15,23,42,.04);
+    }
+    .section-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+    }
+    .section-title h2 {
+      font-size: 22px;
+      font-weight: 800;
+      color: #0f172a;
+    }
+    .sub-button {
+      background: #fff;
+      border: 1px solid #dbe3f0;
+      border-radius: 10px;
+      padding: 10px 18px;
+      font-weight: 600;
+      font-size: 14px;
+      color: #475569;
+      cursor: pointer;
+      font-family: 'Noto Sans JP', sans-serif;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .sub-button:hover { border-color: #1a3a5c; color: #1a3a5c; }
+
+    /* Method grid */
+    .method-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .method-card {
+      border: 2px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 24px;
+      cursor: pointer;
+      transition: .2s;
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .method-card.active { border-color: #1a3a5c; background: #f4f7fb; }
+    .method-card:hover { border-color: #93b4d4; }
+    .method-card.disabled { opacity: .45; pointer-events: none; }
+    .method-icon {
+      font-size: 22px;
+      color: #1a3a5c;
+      margin-top: 2px;
+    }
+    .method-card h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; }
+    .method-card p { font-size: 13px; color: #64748b; margin: 0; }
+
+    /* Exam item */
+    .exam-list { display: flex; flex-direction: column; gap: 12px; }
+    .exam-item {
+      border: 2px solid #e5e7eb;
+      border-radius: 16px;
+      padding: 20px 24px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      cursor: pointer;
+      transition: .2s;
+    }
+    .exam-item.active { border-color: #1a3a5c; background: #f4f7fb; }
+    .exam-item:hover { border-color: #93b4d4; }
+    .exam-icon {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: #dbeafe;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1a3a5c;
+      font-size: 22px;
+      flex-shrink: 0;
+    }
+    .exam-info { flex: 1; }
+    .exam-info h3 { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+    .exam-info p { font-size: 13px; color: #64748b; margin: 0; }
+    .exam-arrow { font-size: 22px; color: #1a3a5c; }
+    .link-text {
+      display: inline-block;
+      margin-top: 16px;
+      color: #1a3a5c;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .link-text:hover { text-decoration: underline; }
+
+    /* Upload area */
+    .upload-area {
+      border: 2px dashed #cbd5e1;
+      border-radius: 14px;
+      background: #fafcff;
+      padding: 20px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      transition: .2s;
+    }
+    .upload-area.dragover { border-color: #1a3a5c; background: #eef5ff; }
+    .upload-button {
+      background: #fff;
+      border: 1px solid #cbd5e1;
+      padding: 9px 20px;
+      border-radius: 10px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      white-space: nowrap;
+      font-family: 'Noto Sans JP', sans-serif;
+    }
+    .upload-button:hover { border-color: #1a3a5c; }
+    .upload-note { color: #94a3b8; font-size: 12px; margin: 0; }
+    .file-selected { margin-top: 14px; color: #1a3a5c; font-weight: 600; font-size: 14px; }
+
+    /* Submit */
+    .submit-button {
+      width: 100%;
+      border: none;
+      background: linear-gradient(135deg, #1a3a5c, #0f2540);
+      color: #fff;
+      border-radius: 16px;
+      padding: 22px;
+      font-size: 20px;
+      font-weight: 800;
+      cursor: pointer;
+      box-shadow: 0 12px 32px rgba(26,58,92,.18);
+      transition: .25s;
+      font-family: 'Noto Sans JP', sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+    }
+    .submit-button:hover:not(:disabled) { transform: translateY(-2px); }
+    .submit-button:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+
+    .sample-links {
+      display: flex;
+      justify-content: center;
+      gap: 36px;
+      margin-top: 22px;
+    }
+    .sample-links a { color: #1a3a5c; text-decoration: none; font-weight: 600; font-size: 14px; }
+    .sample-links a:hover { text-decoration: underline; }
+
+    /* Mapping / Progress / Error */
+    .mapping-card { margin-top: 24px; }
+    .form-label-sm { font-size: 13px; font-weight: 700; display: block; margin-bottom: 4px; color: #475569; }
+    .form-select-sm {
+      width: 100%;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 10px;
+      font-size: 13px;
+      font-family: 'Noto Sans JP', sans-serif;
+      background: #fff;
+    }
+    .form-text { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+    .grade-button {
+      width: 100%;
+      border: none;
+      background: linear-gradient(135deg, #e85d1a, #c04a10);
+      color: #fff;
+      border-radius: 12px;
+      padding: 16px;
+      font-size: 16px;
+      font-weight: 800;
+      cursor: pointer;
+      font-family: 'Noto Sans JP', sans-serif;
+      margin-top: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: .2s;
+    }
+    .grade-button:hover { transform: translateY(-1px); }
+
+    .progress-card {
+      text-align: center;
+      padding: 60px 20px;
+    }
+    .spinner {
+      width: 52px; height: 52px;
+      border: 4px solid #e2e8f0;
+      border-top-color: #1a3a5c;
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+      margin: 0 auto 20px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .progress-card h5 { font-size: 20px; font-weight: 700; margin-bottom: 8px; }
+    .progress-card p { color: #64748b; }
+
+    .error-card {
+      background: #fef2f2;
+      border: 1px solid #fecaca;
+      border-radius: 12px;
+      padding: 16px 20px;
+      color: #b91c1c;
+      font-size: 14px;
+      margin-top: 16px;
+    }
+    .alert-info-box {
+      background: #eff6ff;
+      border: 1px solid #bfdbfe;
+      border-radius: 10px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #1e40af;
+      margin-bottom: 16px;
+    }
+    .mapping-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .mapping-grid-full { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+    /* Footer */
+    footer {
+      background: #1a3a5c;
+      color: #8aa4c0;
+      text-align: center;
+      padding: 20px;
+      font-size: 13px;
+      margin-top: 20px;
+    }
+
+    /* Hidden input */
+    input[type="file"] { display: none; }
+    input[type="radio"] { display: none; }
+
+    @media(max-width: 1100px) {
+      .hero-inner { grid-template-columns: 1fr; }
+      .hero h1 { font-size: 44px; }
+      .hero-image { display: none; }
+    }
+    @media(max-width: 768px) {
+      .container { padding: 0 16px; }
+      .method-grid { grid-template-columns: 1fr; }
+      .mapping-grid, .mapping-grid-full { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="container header-inner">
+    <a class="logo" href="/">
+      <div class="logo-icon"><i class="bi bi-shield-check"></i></div>
+      <span class="logo-text">中上級者認定テスト</span>
+    </a>
+    <nav>
+      <a href="/exam/new">試験登録</a>
+      <a href="/exam/list">試験一覧</a>
+      <a href="/sessions" class="active">採点結果</a>
+      <a href="/guide">使い方</a>
+    </nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="hero-inner">
+    <div>
+      <h1>AI自動採点を開始</h1>
+      <p class="hero-sub">受験者の回答ファイルをアップロードして、<br>AIが自動で採点・集計・分析します。</p>
+
+      <div class="hero-features">
+        <div class="feature">
+          <div class="feature-icon"><i class="bi bi-cpu-fill"></i></div>
+          <h3>高精度な自動採点</h3>
+          <p>事前登録した基準に基づきAIが正確に採点します。</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon"><i class="bi bi-lightning-charge-fill"></i></div>
+          <h3>効率的な運用</h3>
+          <p>大量の答案も短時間で処理し、負担を軽減。</p>
+        </div>
+        <div class="feature">
+          <div class="feature-icon"><i class="bi bi-bar-chart-fill"></i></div>
+          <h3>結果を可視化</h3>
+          <p>採点結果を分析し、レポート化します。</p>
+        </div>
+      </div>
+
+      <button class="hero-button" onclick="document.querySelector('.section').scrollIntoView({behavior:'smooth'})">
+        <i class="bi bi-cloud-arrow-up"></i> 採点をはじめる
+      </button>
+    </div>
+
+    <div class="hero-image">
+      <img src="https://images.unsplash.com/photo-1551434678-e076c223a692?q=80&w=1600&auto=format&fit=crop" alt="AI Dashboard">
+    </div>
+  </div>
+</section>
+
+<main class="section">
+  <div class="container" style="max-width: 900px;">
+
+
+    <!-- 使用する試験を選択 -->
+    <div class="card {% if not exams %}d-none{% endif %}" id="presetSection">
+      <div class="section-title">
+        <h2>使用する試験を選択</h2>
+      </div>
+      {% if exams %}
+      <div class="exam-list">
+        {% for exam in exams %}
+        <div class="exam-item {% if loop.first %}active{% endif %}" id="examCard_{{ exam.exam_id }}" onclick="selectExam('{{ exam.exam_id }}', this)">
+          <div class="exam-icon"><i class="bi bi-file-text-fill"></i></div>
+          <div class="exam-info">
+            <h3>{{ exam.name }}</h3>
+            <p>{{ exam.questions_count }}問　／　登録日：{{ exam.created_at }}</p>
+          </div>
+          <div class="exam-arrow">›</div>
+          <input type="radio" name="exam_choice" value="{{ exam.exam_id }}" {% if loop.first %}checked{% endif %}>
+        </div>
+        {% endfor %}
+      </div>
+      <a href="/exam/list" class="link-text">全試験を管理する ›</a>
+      {% else %}
+      <p style="color:#94a3b8;text-align:center;padding:20px 0">
+        登録済みの試験がありません。<a href="/exam/new" style="color:#1a3a5c;font-weight:700">試験を登録してください</a>
+      </p>
+      {% endif %}
+    </div>
+
+    <!-- 受験者回答ファイル -->
+    <div class="card">
+      <div class="section-title">
+        <h2>受験者回答ファイル</h2>
+      </div>
+      <div class="upload-area" id="uploadArea" ondragover="onDragOver(event)" ondragleave="onDragLeave(event)" ondrop="onDrop(event)">
+        <button class="upload-button" onclick="document.getElementById('answersFile').click()">
+          <i class="bi bi-folder2-open"></i> ファイルを選択
+        </button>
+        <input type="file" id="answersFile" accept=".xlsx,.xls,.csv" onchange="onFileSelected(this)">
+        <span class="upload-note">CSV / XLSX　ドラッグ＆ドロップも可</span>
+        <div class="file-selected d-none" id="fileSelectedLabel"></div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <button class="submit-button" id="uploadBtn" onclick="doUpload()">
+      <i class="bi bi-cpu"></i> アップロードして確認する
+    </button>
+
+    <div class="sample-links">
+      <a href="/static/sample_questions.xlsx"><i class="bi bi-file-earmark-spreadsheet"></i> 問題サンプル</a>
+      <a href="/static/sample_answers.xlsx"><i class="bi bi-file-earmark-spreadsheet"></i> 回答サンプル</a>
+    </div>
+
+  </div>
+</main>
+
+<footer>
+  &copy; 中上級者認定テスト — Powered by Claude AI
+</footer>
+
+<script>
+let sessionId = null;
+let currentMode = '{% if exams %}preset{% else %}manual{% endif %}';
+
+function setMode(mode) {
+  currentMode = mode;
+  document.getElementById('cardPreset').classList.toggle('active', mode === 'preset');
+  document.getElementById('cardManual').classList.toggle('active', mode === 'manual');
+  document.getElementById('presetSection').classList.toggle('d-none', mode !== 'preset');
+}
+
+function selectExam(examId, el) {
+  document.querySelectorAll('.exam-item').forEach(e => e.classList.remove('active'));
+  el.classList.add('active');
+  el.querySelector('input[type=radio]').checked = true;
+}
+
+function onFileSelected(input) {
+  if (input.files[0]) {
+    const label = document.getElementById('fileSelectedLabel');
+    label.textContent = '選択済み: ' + input.files[0].name;
+    label.classList.remove('d-none');
+  }
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('uploadArea').classList.add('dragover');
+}
+function onDragLeave(e) {
+  document.getElementById('uploadArea').classList.remove('dragover');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('uploadArea').classList.remove('dragover');
+  const file = e.dataTransfer.files[0];
+  if (file) {
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    document.getElementById('answersFile').files = dt.files;
+    onFileSelected(document.getElementById('answersFile'));
+  }
+}
+
+async function doUpload() {
+  const aFile = document.getElementById('answersFile').files[0];
+  if (!aFile) { showError('回答ファイルを選択してください。'); return; }
+
+  const fd = new FormData();
+  fd.append('answers_file', aFile);
+
+  if (currentMode === 'preset') {
+    const examRadio = document.querySelector('input[name="exam_choice"]:checked');
+    if (!examRadio) { showError('試験を選択してください。'); return; }
+    fd.append('exam_id', examRadio.value);
+  }
+
+  setLoading(true);
+  try {
+    const res = await fetch('/upload', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error); return; }
+    sessionId = data.session_id;
+    showMapping(data);
+    hideError();
+  } catch(e) {
+    showError('通信エラー: ' + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function showMapping(data) {
+  const info = document.getElementById('previewInfo');
+  const examLabel = data.exam_name ? `「${data.exam_name}」` : '';
+  info.innerHTML = `<i class="bi bi-check-circle-fill" style="color:#1a6e3c"></i> 試験${examLabel}：問題数 <strong>${data.questions_count}</strong>件、受験者数 <strong>${data.examinees_count}</strong>名を読み込みました。`;
+  info.classList.remove('d-none');
+
+  const hasSavedMapping = data.mode === 'preset' && data.column_mapping && Object.keys(data.column_mapping).length > 0;
+  const mf = document.getElementById('mappingForm');
+
+  if (hasSavedMapping) {
+    mf.innerHTML = `<div class="mapping-grid">${buildAnsMapping(data.a_columns)}</div>`;
+  } else {
+    const qLast = data.q_columns.length - 1;
+    mf.innerHTML = `
+      <p class="form-label-sm" style="margin-bottom:12px">問題ファイルの列</p>
+      <div class="mapping-grid-full" style="margin-bottom:16px">
+        ${buildSelect('q_id','問題ID列', data.q_columns, 0)}
+        ${buildSelect('q_text','問題文列', data.q_columns, 1)}
+        ${buildSelect('q_type','問題種別列', data.q_columns, 2)}
+        ${buildSelect('q_genre','対象ジャンル列', data.q_columns, 3)}
+        ${buildSelect('q_rubric','採点基準列', data.q_columns, qLast)}
+      </div>
+      <div style="margin-bottom:16px">
+        <label class="form-label-sm">コンピテンシー列（複数選択）<span style="font-weight:400;color:#94a3b8"> — ○印が入っている列をすべて選択</span></label>
+        <select class="form-select-sm" data-key="competency_cols" multiple size="5">
+          ${data.q_columns.map(c => `<option value="${c}">${c}</option>`).join('')}
+        </select>
+        <div class="form-text">Ctrl（Mac: ⌘）クリックで複数選択。未選択の場合は自動検出します。</div>
+      </div>
+      <p class="form-label-sm" style="margin-bottom:12px">回答ファイルの列</p>
+      <div class="mapping-grid">${buildAnsMapping(data.a_columns)}</div>`;
+  }
+  document.getElementById('mappingSection').classList.remove('d-none');
+  document.getElementById('mappingSection').scrollIntoView({behavior:'smooth'});
+}
+
+function buildAnsMapping(cols) {
+  return buildSelect('a_id','受験者ID列', cols, 0) +
+         buildSelect('a_name','氏名列', cols, 1) +
+         buildSelect('a_dept','所属部署列', cols, 2) +
+         buildSelect('a_genre','ジャンル列', cols, 3);
+}
+
+function buildSelect(key, label, cols, defaultIdx) {
+  const opts = cols.map((c, i) => `<option value="${c}" ${i===defaultIdx?'selected':''}>${c}</option>`).join('');
+  return `<div>
+    <label class="form-label-sm">${label}</label>
+    <select class="form-select-sm" data-key="${key}">${opts}</select>
+  </div>`;
+}
+
+async function doGrade() {
+  const mapping = {};
+  document.querySelectorAll('[data-key]').forEach(el => {
+    mapping[el.dataset.key] = el.multiple
+      ? Array.from(el.selectedOptions).map(o => o.value)
+      : el.value;
+  });
+  document.getElementById('mappingSection').classList.add('d-none');
+  document.getElementById('progressSection').classList.remove('d-none');
+  try {
+    const res = await fetch('/grade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId, column_mapping: mapping })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      document.getElementById('progressSection').classList.add('d-none');
+      showError(data.error + (data.detail ? '<br><pre style="font-size:11px;margin-top:8px">' + data.detail + '</pre>' : ''));
+      return;
+    }
+    window.location.href = `/results/${sessionId}`;
+  } catch(e) {
+    document.getElementById('progressSection').classList.add('d-none');
+    showError('採点エラー: ' + e.message);
+  }
+}
+
+function setLoading(on) {
+  const btn = document.getElementById('uploadBtn');
+  btn.disabled = on;
+  btn.innerHTML = on
+    ? '<span style="display:inline-block;width:20px;height:20px;border:3px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .8s linear infinite"></span> 読み込み中...'
+    : '<i class="bi bi-cpu"></i> アップロードして確認する';
+}
+function showError(msg) {
+  const el = document.getElementById('errorSection');
+  el.innerHTML = '<i class="bi bi-exclamation-triangle-fill"></i> ' + msg;
+  el.classList.remove('d-none');
+}
+function hideError() { document.getElementById('errorSection').classList.add('d-none'); }
+
+// URL params
+const urlParams = new URLSearchParams(window.location.search);
+const urlExamId = urlParams.get('exam_id');
+if (urlExamId) {
+  const card = document.getElementById('examCard_' + urlExamId);
+  if (card) selectExam(urlExamId, card);
+}
+</script>
+</body>
+</html>

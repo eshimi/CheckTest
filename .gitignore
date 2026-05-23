@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+
+# シークレット
+.env
+.env.*
+*.secret
+
+# ランタイムデータ
+results/
+uploads/
+
+# ログ・一時ファイル
+*.log
+tmp_*
+*.tmp
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+.claude/

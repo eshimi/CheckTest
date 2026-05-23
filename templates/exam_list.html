@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+{% block title %}登録済み試験一覧 | 中上級者認定テスト{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h2 class="fw-bold mb-0" style="color:var(--primary)"><i class="bi bi-archive me-2"></i>登録済み試験一覧</h2>
+    <p class="text-muted small mb-0">{{ exams|length }} 件の試験が登録されています</p>
+  </div>
+  <a href="/exam/new" class="btn text-white" style="background:var(--accent)">
+    <i class="bi bi-plus-lg me-1"></i>新しい試験を登録
+  </a>
+</div>
+
+{% if exams %}
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0">
+      <thead style="background:var(--primary);color:#fff;">
+        <tr>
+          <th class="ps-3">試験名</th>
+          <th class="text-center">問題数</th>
+          <th class="text-center">登録日</th>
+          <th class="text-center">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for exam in exams %}
+        <tr>
+          <td class="ps-3">
+            <div class="fw-bold">{{ exam.name }}</div>
+            <div class="text-muted small font-monospace">{{ exam.exam_id }}</div>
+          </td>
+          <td class="text-center">{{ exam.questions_count }} 問</td>
+          <td class="text-center small">{{ exam.created_at }}</td>
+          <td class="text-center">
+            <a href="/?exam_id={{ exam.exam_id }}" class="btn btn-sm btn-outline-primary me-1">
+              <i class="bi bi-play-fill"></i> 採点開始
+            </a>
+            <form method="POST" action="/exam/{{ exam.exam_id }}/delete" class="d-inline"
+                  onsubmit="return confirm('「{{ exam.name }}」を削除しますか？')">
+              <button type="submit" class="btn btn-sm btn-outline-danger">
+                <i class="bi bi-trash"></i>
+              </button>
+            </form>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<div class="card">
+  <div class="card-body text-center py-5 text-muted">
+    <i class="bi bi-inbox fs-1 d-block mb-3"></i>
+    まだ試験が登録されていません。
+    <div class="mt-3">
+      <a href="/exam/new" class="btn text-white" style="background:var(--primary)">
+        <i class="bi bi-plus-lg me-1"></i>試験を登録する
+      </a>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

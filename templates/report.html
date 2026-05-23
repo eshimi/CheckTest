@@ -1,0 +1,604 @@
+{% extends "base.html" %}
+{% block title %}{{ examinee.id | mask_id }} 採点レポート{% endblock %}
+
+{% block extra_head %}
+<script src="/static/js/chart.min.js"></script>
+<style>
+/* ── 横レイアウト: コンテナを全幅に拡張 ── */
+.container {
+  max-width: none !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+}
+
+/* ── Report Sheet ── */
+.report-sheet {
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 28px 36px 22px;
+  margin-bottom: 1.5rem;
+}
+
+/* ── Header ── */
+.rpt-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 3px solid var(--primary);
+}
+.rpt-title-area h1 {
+  margin: 0 0 6px;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--primary);
+  letter-spacing: .04em;
+}
+.rpt-title-area p {
+  margin: 0;
+  font-size: 13px;
+  color: #555;
+  line-height: 1.7;
+}
+.rpt-header-right {
+  text-align: right;
+  flex-shrink: 0;
+  margin-left: 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.rpt-logo {
+  height: 30px;
+  width: auto;
+  display: block;
+}
+.rpt-pct-block {
+  text-align: right;
+}
+.rpt-pct {
+  display: block;
+  font-size: 40px;
+  font-weight: 700;
+  color: var(--primary);
+  line-height: 1;
+}
+.rpt-pct-sub {
+  font-size: 12px;
+  color: #666;
+  margin-top: 4px;
+}
+
+/* ── Two-column layout (radar left + table right) ── */
+.rpt-mid {
+  display: flex;
+  gap: 36px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+.rpt-mid-left {
+  width: 70%;
+}
+.rpt-mid-right {
+  width: 30%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── Sections ── */
+.rpt-section { margin-bottom: 24px; }
+.rpt-section-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary);
+  background: #eef2f7;
+  padding: 5px 10px;
+  border-radius: 5px;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+  margin-bottom: 10px;
+  padding-left: 10px;
+  border-left: 4px solid var(--primary);
+}
+.rpt-box {
+  border: 1px solid #bbb;
+  padding: 14px 16px;
+  line-height: 1.85;
+  font-size: 13.5px;
+  background: #fafafa;
+  border-radius: 4px;
+}
+
+/* ── Competency Table ── */
+.rpt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+.rpt-table th, .rpt-table td {
+  border: 1px solid #ccc;
+  padding: 10px 12px;
+  vertical-align: top;
+}
+.rpt-table thead th {
+  background: var(--primary);
+  color: #fff;
+  text-align: center;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+.rpt-table tbody tr:nth-child(even) { background: #f7f9fc; }
+.rpt-score-cell {
+  text-align: center;
+  font-weight: 700;
+  font-size: 18px;
+  white-space: nowrap;
+  width: 72px;
+}
+
+/* ── Radar ── */
+.rpt-radar-title {
+  font-size: 16px;
+  font-weight: 700;
+  text-align: center;
+  color: var(--primary);
+  margin-bottom: 12px;
+}
+
+.footer-bar { display: none !important; }
+
+/* ── Sheet footer ── */
+.rpt-sheet-footer {
+  margin-top: 24px;
+  padding-top: 12px;
+  border-top: 2px solid var(--primary);
+  font-size: 12px;
+  color: #888;
+  display: flex;
+  justify-content: space-between;
+}
+
+/* ── Print: A4横1枚に収める ── */
+@media print {
+  @page { size: A4 landscape; margin: 8mm 10mm; }
+
+  /* ナビ・ボタン類を非表示 */
+  nav, .navbar, .d-flex.justify-content-between.mb-3,
+  #pdfDlBtn, [onclick] { display: none !important; }
+
+  /* report-sheet だけを1ページ目に収め、以降は2ページ目以降へ */
+  .report-sheet {
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    page-break-after: always;
+  }
+
+  /* ページ全体フォント縮小 */
+  body, .rpt-box, .rpt-table, .rpt-table th, .rpt-table td {
+    font-size: 9.5pt !important;
+    line-height: 1.55 !important;
+  }
+
+  /* ヘッダー */
+  .rpt-header { margin-bottom: 8px !important; padding-bottom: 8px !important; }
+  .rpt-title-area h1 { font-size: 13pt !important; margin-bottom: 3px !important; }
+  .rpt-title-area p  { font-size: 8.5pt !important; }
+  .rpt-pct           { font-size: 22pt !important; }
+  .rpt-pct-sub       { font-size: 8pt !important; }
+  .rpt-logo          { height: 22px !important; }
+  .rpt-header-right  { gap: 5px !important; }
+
+  /* セクション共通 */
+  .rpt-section        { margin-bottom: 14px !important; }
+  .rpt-section-title  { font-size: 10pt !important; margin-bottom: 3px !important; padding: 3px 7px !important; background: #eef2f7 !important; -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  .rpt-box            { padding: 6px 10px !important; }
+
+  /* 中段レイアウト */
+  .rpt-mid     { gap: 14px !important; margin-bottom: 5px !important; }
+  .rpt-mid-left  { width: 68% !important; }
+  .rpt-mid-right { width: 32% !important; }
+
+  /* コンピテンシー表 */
+  .rpt-table th, .rpt-table td { padding: 3px 6px !important; }
+  .rpt-score-cell { font-size: 11.5pt !important; width: 50px !important; }
+
+  /* レーダーチャートを印刷サイズに合わせる */
+  .rpt-radar-title    { font-size: 8.5pt !important; margin-bottom: 6px !important; }
+  .rpt-mid-right      { padding-top: 20px !important; }
+  #radarChart         { max-width: 300px !important; max-height: 300px !important; }
+
+  /* フッター */
+  .rpt-sheet-footer   { margin-top: 4px !important; padding-top: 5px !important; font-size: 7.5pt !important; }
+
+  /* シーン別以降は2ページ目で印刷 */
+  .card, h5.fw-bold { page-break-before: auto; }
+}
+
+/* ── Scene / Question sections below ── */
+.comp-bar-track { background:#e9ecef; border-radius:6px; height:10px; }
+.comp-bar-fill  { height:10px; border-radius:6px; }
+.question-card  { border-left:4px solid var(--primary); }
+.comp-badge     { font-size:.72rem; padding:.25em .6em; border-radius:4px; }
+.scene-header   { background:linear-gradient(90deg,var(--primary) 0%,#2a5a8c 100%); color:#fff; border-radius:8px 8px 0 0; }
+.scene-score-box{ border:2px solid var(--primary); border-radius:10px; }
+.overall-box    { background:#f0f4f8; border-left:5px solid var(--primary); border-radius:6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+{# ── Action buttons ── #}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <a href="/results/{{ session_id }}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left me-1"></i>一覧に戻る
+  </a>
+  <div>
+<a href="/report/{{ session_id }}/{{ examinee.id }}/download" class="btn btn-sm text-white me-1" style="background:var(--primary)">
+      <i class="bi bi-file-word me-1"></i>Word DL
+    </a>
+    <button class="btn btn-sm btn-outline-secondary ms-1" onclick="printOffice()">
+      <i class="bi bi-printer me-1"></i>印刷（PDF）
+    </button>
+  </div>
+</div>
+
+{# ── Report Sheet ── #}
+<div class="report-sheet">
+
+  {# Header #}
+  <div class="rpt-header">
+    <div class="rpt-title-area">
+      <h1><i class="bi bi-shield-check me-2"></i>認定プログラムフィードバックシート</h1>
+      <p style="font-size:22px;font-weight:normal;margin-bottom:4px">
+        {{ examinee.id | mask_id }} 様　｜　グループID: {{ examinee.department }}　｜　ジャンル: {{ examinee.genre or '未設定' }}
+      </p>
+      <p>ご受講いただいた「中上級者認定テスト」の採点結果フィードバックです。</p>
+    </div>
+    <div class="rpt-header-right">
+      <img src="/static/images/docomo_business.png" alt="NTT docomo Business" class="rpt-logo">
+      <div class="rpt-pct-block">
+        <span class="rpt-pct">{{ examinee.percentage }}%</span>
+        <div class="rpt-pct-sub">
+          総合得点率　{{ examinee.total_score }} / {{ examinee.total_max }}点
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {% set comment_parts = overall_comment.split('\n\n') %}
+
+  {# Section 1: 総評（全幅） #}
+  <div class="rpt-section">
+    <div class="rpt-section-title">1. 総評</div>
+    <div class="rpt-box">{{ comment_parts[0] if comment_parts else '' }}</div>
+  </div>
+
+  {# 中段：コンピテンシー表（左）＋ レーダー（右） #}
+  <div class="rpt-mid">
+
+    {# LEFT: Section 2 #}
+    <div class="rpt-mid-left">
+      <div class="rpt-section-title">2. コンピテンシーごとの評価</div>
+      <table class="rpt-table">
+        <thead>
+          <tr>
+            <th style="width:110px">コンピテンシー</th>
+            <th style="width:72px">得点率</th>
+            <th>評価コメント</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for comp in examinee.competency_cols %}
+          {% set rate = examinee.comp_rates.get(comp, 0) %}
+          <tr>
+            <td class="fw-bold">{{ comp }}</td>
+            <td class="rpt-score-cell"
+              style="color:{% if rate >= 90 %}var(--success){% elif rate >= 70 %}#1a4e8c{% elif rate >= 50 %}#8c6e1a{% else %}#8c2a1a{% endif %}">
+              {{ rate }}%
+            </td>
+            <td>{{ comp_comments.get(comp, '') }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {# RIGHT: Radar #}
+    <div class="rpt-mid-right">
+      <div class="rpt-radar-title">コンピテンシー評価チャート</div>
+      <canvas id="radarChart" style="max-width:380px;max-height:380px"></canvas>
+    </div>
+
+  </div>
+
+  {# Section 3: 改善提案（全幅） #}
+  <div class="rpt-section">
+    <div class="rpt-section-title">3. 改善提案</div>
+    <div class="rpt-box">{{ comment_parts[1] if comment_parts | length > 1 else '' }}</div>
+  </div>
+
+
+</div>
+
+<div id="report-details">
+{# ── シーン別得点 ── #}
+{% if scene_scores %}
+<div class="card mb-4">
+  <div class="card-header fw-bold py-2" style="background:#e8eef5;color:var(--primary)">
+    <i class="bi bi-layers me-2"></i>シーン別得点
+  </div>
+  <div class="card-body">
+    <div class="row g-3 justify-content-center">
+      {% for scene in scene_order %}
+      {% if scene in scene_scores %}
+      {% set ss = scene_scores[scene] %}
+      {% set color = 'var(--success)' if ss.pct >= 75 else ('#8c6e1a' if ss.pct >= 50 else '#8c2a1a') %}
+      <div class="col-md-4">
+        <div class="scene-score-box p-3 h-100">
+          <div class="fw-bold text-center mb-1" style="color:var(--primary)">{{ scene }}</div>
+          <div class="fs-3 fw-bold text-center" style="color:{{ color }}">{{ ss.total }}<span class="fs-6 text-muted fw-normal"> / {{ ss.max }}点</span></div>
+          <div class="comp-bar-track mt-1 mb-1 mx-auto" style="max-width:140px">
+            <div class="comp-bar-fill" style="width:{{ [ss.pct, 100] | min }}%;background:{{ color }}"></div>
+          </div>
+          <div class="text-center mb-2"><small class="text-muted">得点率 {{ ss.pct }}%</small></div>
+          <hr class="my-2">
+          {% for comp, cb in ss.comp_breakdown.items() %}
+          {% set ccolor = 'var(--success)' if cb.pct >= 75 else ('#8c6e1a' if cb.pct >= 50 else '#8c2a1a') %}
+          <div class="mb-1">
+            <div class="d-flex justify-content-between" style="font-size:.75rem">
+              <span class="fw-bold">{{ comp }}</span>
+              <span style="color:{{ ccolor }}">{{ cb.total }}/{{ cb.max }}点 ({{ cb.pct }}%)</span>
+            </div>
+            <div class="comp-bar-track" style="height:8px">
+              <div class="comp-bar-fill" style="height:8px;width:{{ [cb.pct, 100] | min }}%;background:{{ ccolor }}"></div>
+            </div>
+          </div>
+          {% endfor %}
+          {% if scene_comments and scene in scene_comments %}
+          <hr class="my-2">
+          <p class="small mb-0" style="color:#444;line-height:1.6">{{ scene_comments[scene] }}</p>
+          {% endif %}
+        </div>
+      </div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── ジャンル内比較 ── #}
+{% if genre_stats %}
+<div class="card mb-4">
+  <div class="card-header fw-bold py-2" style="background:#e8eef5;color:var(--primary)">
+    <i class="bi bi-people me-2"></i>ジャンル内比較（{{ examinee.genre }}）
+  </div>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-md-4 text-center">
+        <div class="text-muted small">ジャンル内順位</div>
+        <div class="fs-3 fw-bold" style="color:var(--primary)">{{ genre_stats.rank }} <span class="fs-6 text-muted">/ {{ genre_stats.total }}名</span></div>
+      </div>
+      <div class="col-md-4 text-center border-start border-end">
+        <div class="text-muted small">ジャンル平均</div>
+        <div class="fs-3 fw-bold">{{ genre_stats.avg }}%</div>
+      </div>
+      <div class="col-md-4 text-center">
+        <div class="text-muted small">平均との差</div>
+        {% set diff = (examinee.percentage - genre_stats.avg) | round(1) %}
+        <div class="fs-3 fw-bold {% if diff >= 0 %}text-success{% else %}text-danger{% endif %}">
+          {% if diff >= 0 %}+{% endif %}{{ diff }}%
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{# ── 問題別採点結果 ── #}
+<h5 class="fw-bold mb-3" style="color:var(--primary)"><i class="bi bi-journal-text me-2"></i>問題別採点結果</h5>
+
+{% set q_counter = namespace(n=0) %}
+{% for scene in scene_order %}
+{% if scene in answers_by_scene %}
+{% set scene_answers = answers_by_scene[scene] %}
+{% set ss = scene_scores.get(scene, {'total': 0, 'max': 0, 'pct': 0}) %}
+{% set s_total = ss.total %}
+{% set s_max   = ss.max %}
+{% set s_pct   = ss.pct | round(0) | int %}
+
+<div class="mb-4">
+  <div class="scene-header px-3 py-2 d-flex justify-content-between align-items-center mb-0">
+    <span class="fw-bold"><i class="bi bi-layers me-2"></i>{{ scene }}</span>
+    <span class="fw-bold">{{ s_total }} / {{ s_max }}点 ({{ s_pct }}%)</span>
+  </div>
+
+  {% for ans in scene_answers %}
+  {% set q_counter.n = q_counter.n + 1 %}
+  {% set total_q = ans.competency_scores.values() | sum %}
+  {% set max_q   = ans.competencies | length * 2 %}
+  {% set pct_q   = (total_q / max_q * 100) | round(0) | int if max_q > 0 else 0 %}
+
+  <div class="card mb-2 question-card" style="border-radius:0{% if loop.last %} 0 0 8px 8px{% endif %}">
+    <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#f0f4f8">
+      <div>
+        <span class="badge bg-secondary me-1">問{{ q_counter.n }}</span>
+        <span class="badge bg-light text-dark border me-1">{{ ans.question_type }}</span>
+        <span class="fw-bold small">{{ ans.question_text | strip_comp_note }}</span>
+      </div>
+      <div class="text-end" style="min-width:100px">
+        <span class="fw-bold" style="color:{% if pct_q >= 70 %}var(--success){% elif pct_q >= 40 %}#8c6e1a{% else %}#8c2a1a{% endif %}">
+          {{ total_q }}
+        </span>
+        <span class="text-muted small"> / {{ max_q }}点</span>
+      </div>
+    </div>
+    <div class="card-body py-2">
+
+      {% if ans.forced_zero %}
+      <div class="alert alert-danger py-2 px-3 mb-2 d-flex align-items-center gap-2">
+        <i class="bi bi-slash-circle-fill fs-5"></i>
+        <div><span class="fw-bold">強制0点適用</span><span class="ms-2">{{ ans.forced_zero_reason }}</span></div>
+      </div>
+      {% endif %}
+
+      <div class="mb-2 d-flex flex-wrap align-items-center gap-1">
+        <span class="small fw-bold text-muted me-1">コンピテンシー別得点：</span>
+        {% for comp, score in ans.competency_scores.items() %}
+        <span class="comp-badge fw-bold border"
+          style="background:{% if ans.forced_zero %}#f8d7da{% elif score >= 2 %}#d4edda{% elif score == 1 %}#fff3cd{% else %}#f8d7da{% endif %};
+                 color:{% if ans.forced_zero %}#8c2a1a{% elif score >= 2 %}#1a6e3c{% elif score == 1 %}#856404{% else %}#8c2a1a{% endif %}">
+          {{ comp }}: {{ score }}/3{% if ans.forced_zero %} ⚠{% endif %}
+        </span>
+        {% endfor %}
+      </div>
+
+      <div class="small text-muted fw-bold mb-1">受験者の回答</div>
+      <div class="p-2 rounded small mb-2" style="background:#f8f9fa;border:1px solid #dee2e6;min-height:2rem;white-space:pre-wrap">{{ ans.answer_text or '（無回答）' }}</div>
+
+      {% if ans.competency_reasons %}
+      <div class="mt-1">
+        {% for comp, reason in ans.competency_reasons.items() %}
+        <div class="mb-1 small" style="background:#f0f4f8;border:1px solid #ccd5e0;border-radius:4px;padding:3px 8px;color:#333">
+          <span class="fw-bold me-1">{{ comp }}：</span>{{ reason }}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endfor %}
+
+</div>{# /report-details #}
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function() {
+  // RadarController.defaults.elements.line.fill = "start" が root cause
+  // これを直接上書きしてから Chart インスタンスを作る
+  const radarCtrl = Chart.registry.controllers.get('radar');
+  if (radarCtrl?.defaults?.elements?.line) {
+    radarCtrl.defaults.elements.line.fill = false;
+    radarCtrl.defaults.elements.line.backgroundColor = 'rgba(0,0,0,0)';
+  }
+
+  {% set comp_labels = examinee.competency_cols %}
+  {% set examinee_vals = [] %}
+  {% set avg_vals = [] %}
+  {% for comp in comp_labels %}
+    {% set _ = examinee_vals.append(examinee.comp_rates.get(comp, 0)) %}
+    {% set _ = avg_vals.append(avg_comp_rates.get(comp, 0)) %}
+  {% endfor %}
+  const labels      = {{ comp_labels | tojson }};
+  const examData    = {{ examinee_vals | tojson }};
+  const avgData     = {{ avg_vals | tojson }};
+  const examName    = {{ (examinee.id | mask_id) | tojson }};
+  const maxVal      = Math.max(150, Math.ceil(Math.max(...examData) / 25) * 25);
+
+  const ctx = document.getElementById('radarChart');
+  if (!ctx) return;
+  const radarChart = new Chart(ctx, {
+    type: 'radar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: examName,
+          data: examData,
+          fill: false,
+          backgroundColor: 'rgba(0,0,0,0)',
+          borderColor: '#1a3a5c',
+          borderWidth: 2.5,
+          pointBackgroundColor: '#1a3a5c',
+          pointRadius: 4,
+        },
+        {
+          label: '全体平均',
+          data: avgData,
+          fill: false,
+          backgroundColor: 'rgba(0,0,0,0)',
+          borderColor: '#e85d1a',
+          borderWidth: 2,
+          borderDash: [6, 4],
+          pointBackgroundColor: '#e85d1a',
+          pointRadius: 3,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      animation: { duration: 0 },
+      elements: { line: { fill: false } },
+      scales: {
+        r: {
+          min: 0,
+          max: maxVal,
+          ticks: { stepSize: 25, font: { size: 9 }, backdropColor: 'transparent' },
+          pointLabels: { font: { size: 11 } },
+          grid: { color: 'rgba(0,0,0,0.08)' },
+        }
+      },
+      plugins: {
+        colors: { enabled: false },
+        filler: { propagate: false },
+        legend: { position: 'bottom', labels: { font: { size: 11 }, boxWidth: 14 } },
+        tooltip: { callbacks: { label: c => `${c.dataset.label}: ${c.raw}%` } }
+      }
+    }
+  });
+  // Chart.js resolves fill:"start" + auto backgroundColor from RadarController defaults
+  // Override the resolved LineElement instance options directly, then redraw (no update = no re-resolve)
+  radarChart.data.datasets.forEach((ds, i) => {
+    const meta = radarChart.getDatasetMeta(i);
+    if (meta.dataset?.options) {
+      meta.dataset.options.fill = false;
+      meta.dataset.options.backgroundColor = 'rgba(0,0,0,0)';
+    }
+  });
+  radarChart.draw();
+})();
+</script>
+<script>
+function printExaminee() {
+  const style = document.createElement('style');
+  style.id = '_print_examinee';
+  style.textContent = `
+    @page { size: A4 landscape; margin: 0; }
+    @media print {
+      #report-details { display: none !important; }
+      .action-bar     { display: none !important; }
+    }
+  `;
+  document.head.appendChild(style);
+  window.addEventListener('afterprint', () => {
+    document.getElementById('_print_examinee')?.remove();
+  }, { once: true });
+  window.print();
+}
+
+function printOffice() {
+  const style = document.createElement('style');
+  style.id = '_print_office';
+  style.textContent = `
+    @page { size: A4 landscape; margin: 0 12mm; }
+    @media print {
+      .action-bar { display: none !important; }
+    }
+  `;
+  document.head.appendChild(style);
+  window.addEventListener('afterprint', () => {
+    document.getElementById('_print_office')?.remove();
+  }, { once: true });
+  window.print();
+}
+</script>
+{% endblock %}

@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% block title %}試験問題の事前登録 | 中上級者認定テスト{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-7">
+    <div class="d-flex align-items-center mb-1">
+      <a href="/" class="btn btn-sm btn-outline-secondary me-3"><i class="bi bi-arrow-left"></i></a>
+      <h2 class="fw-bold mb-0" style="color:var(--primary)"><i class="bi bi-clipboard-plus me-2"></i>試験問題の事前登録</h2>
+    </div>
+    <p class="text-muted mb-4">問題・採点基準ファイルをあらかじめ登録しておくことで、採点時は回答ファイルをアップロードするだけで採点が開始できます。</p>
+
+    <!-- Step 1: ファイルアップロード -->
+    <div class="card mb-4" id="step1Card">
+      <div class="card-header fw-bold" style="background:#e8eef5;color:var(--primary)">
+        <span class="badge me-2" style="background:var(--primary)">Step 1</span>試験名とファイルの指定
+      </div>
+      <div class="card-body p-4">
+        <div class="mb-3">
+          <label class="form-label fw-bold">試験名 <span class="text-danger">*</span></label>
+          <input type="text" class="form-control" id="examName" placeholder="例：2026年度 第1回 防災認定試験（中上級）" maxlength="100">
+        </div>
+        <div class="mb-4">
+          <label class="form-label fw-bold"><i class="bi bi-file-earmark-spreadsheet me-1 text-success"></i>問題・採点基準ファイル (.xlsx / .csv) <span class="text-danger">*</span></label>
+          <input type="file" class="form-control" id="questionsFile" accept=".xlsx,.xls,.csv">
+          <div class="form-text">
+            必須列：問題ID / 問題文 / 問題種別（記述式・選択式・○×式）/ 配点 / 採点基準
+          </div>
+        </div>
+        <button class="btn w-100 text-white fw-bold" style="background:var(--primary)" id="uploadBtn">
+          <i class="bi bi-cloud-arrow-up me-2"></i>アップロードして列を確認する
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2: 列マッピング -->
+    <div class="card mb-4 d-none" id="step2Card">
+      <div class="card-header fw-bold" style="background:#e8eef5;color:var(--primary)">
+        <span class="badge me-2" style="background:var(--primary)">Step 2</span>列の対応づけを確認する
+      </div>
+      <div class="card-body p-4">
+        <div id="step2Info" class="alert alert-info small mb-3"></div>
+        <div class="row g-3" id="mappingForm"></div>
+        <button class="btn w-100 text-white fw-bold mt-4" style="background:var(--accent)" id="confirmBtn">
+          <i class="bi bi-check-circle me-2"></i>この内容で試験を登録する
+        </button>
+      </div>
+    </div>
+
+    <!-- 完了 -->
+    <div class="card d-none" id="doneCard">
+      <div class="card-body text-center py-5">
+        <div class="fs-1 mb-2">✅</div>
+        <h4 class="fw-bold text-success">試験の登録が完了しました</h4>
+        <p class="text-muted" id="doneMsg"></p>
+        <div class="d-flex justify-content-center gap-3 mt-3">
+          <a href="/exam/new" class="btn btn-outline-primary">さらに試験を登録する</a>
+          <a href="/" class="btn text-white" style="background:var(--primary)">採点を開始する</a>
+        </div>
+      </div>
+    </div>
+
+    <div id="errorBox" class="alert alert-danger d-none mt-3"></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+let examId = null;
+
+const MAPPING_FIELDS = [
+  { key: 'q_id',     label: '問題ID列',       defaultIdx: 0 },
+  { key: 'q_text',   label: '問題文列',       defaultIdx: 1 },
+  { key: 'q_type',   label: '問題種別列',     defaultIdx: 2 },
+  { key: 'q_genre',  label: '対象ジャンル列', defaultIdx: 3 },
+  { key: 'q_rubric', label: '採点基準列（最終列）', defaultIdx: -1 },
+];
+
+document.getElementById('uploadBtn').addEventListener('click', async () => {
+  const name = document.getElementById('examName').value.trim();
+  const file = document.getElementById('questionsFile').files[0];
+  if (!name) { showError('試験名を入力してください。'); return; }
+  if (!file)  { showError('問題ファイルを選択してください。'); return; }
+
+  const fd = new FormData();
+  fd.append('exam_name', name);
+  fd.append('questions_file', file);
+  setUploadLoading(true);
+  try {
+    const res = await fetch('/exam/register', { method: 'POST', body: fd });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error); return; }
+    examId = data.exam_id;
+    showMappingStep(data);
+    hideError();
+  } catch(e) {
+    showError('通信エラー: ' + e.message);
+  } finally {
+    setUploadLoading(false);
+  }
+});
+
+function showMappingStep(data) {
+  document.getElementById('step2Info').innerHTML =
+    `<i class="bi bi-check-circle-fill text-success me-1"></i>` +
+    `<strong>${data.exam_name}</strong> — 問題数 <strong>${data.questions_count}</strong> 件を読み込みました。列の対応を確認してください。`;
+
+  const form = document.getElementById('mappingForm');
+  form.innerHTML = MAPPING_FIELDS.map(f => {
+    const idx = f.defaultIdx < 0 ? data.columns.length + f.defaultIdx : f.defaultIdx;
+    const opts = data.columns.map((c, i) =>
+      `<option value="${c}" ${i === idx ? 'selected' : ''}>${c}</option>`
+    ).join('');
+    return `<div class="col-md-6">
+      <label class="form-label small fw-bold">${f.label}</label>
+      <select class="form-select" data-key="${f.key}">${opts}</select>
+    </div>`;
+  }).join('');
+
+  // コンピテンシー列（複数選択）
+  const compOpts = data.columns.map(c =>
+    `<option value="${c}">${c}</option>`
+  ).join('');
+  form.innerHTML += `<div class="col-12 mt-2">
+    <label class="form-label small fw-bold">
+      コンピテンシー列（複数選択可）
+      <span class="text-muted fw-normal">— ○印が入っている列をすべて選択</span>
+    </label>
+    <select class="form-select" data-key="competency_cols" multiple size="5">${compOpts}</select>
+    <div class="form-text">Ctrl（Mac: ⌘）クリックで複数選択。未選択の場合は自動検出します。</div>
+  </div>`;
+
+  // 回答ファイルの列マッピング
+  form.innerHTML += `<div class="col-12 mt-2"><h6 class="fw-bold text-muted">回答ファイルの列（採点時に設定）</h6></div>`;
+
+  document.getElementById('step2Card').classList.remove('d-none');
+  document.getElementById('step1Card').style.opacity = '.5';
+  document.getElementById('step1Card').style.pointerEvents = 'none';
+}
+
+document.getElementById('confirmBtn').addEventListener('click', async () => {
+  const mapping = {};
+  document.querySelectorAll('[data-key]').forEach(el => {
+    if (el.multiple) {
+      mapping[el.dataset.key] = Array.from(el.selectedOptions).map(o => o.value);
+    } else {
+      mapping[el.dataset.key] = el.value;
+    }
+  });
+
+  const btn = document.getElementById('confirmBtn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>登録中...';
+
+  try {
+    const res = await fetch('/exam/confirm_mapping', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ exam_id: examId, column_mapping: mapping })
+    });
+    const data = await res.json();
+    if (!res.ok) { showError(data.error); return; }
+
+    document.getElementById('step2Card').classList.add('d-none');
+    document.getElementById('doneMsg').textContent =
+      `試験ID: ${examId} として保存されました。採点画面から選択できます。`;
+    document.getElementById('doneCard').classList.remove('d-none');
+  } catch(e) {
+    showError('登録エラー: ' + e.message);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="bi bi-check-circle me-2"></i>この内容で試験を登録する';
+  }
+});
+
+function setUploadLoading(on) {
+  const btn = document.getElementById('uploadBtn');
+  btn.disabled = on;
+  btn.innerHTML = on
+    ? '<span class="spinner-border spinner-border-sm me-2"></span>読み込み中...'
+    : '<i class="bi bi-cloud-arrow-up me-2"></i>アップロードして列を確認する';
+}
+function showError(msg) {
+  const el = document.getElementById('errorBox');
+  el.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>' + msg;
+  el.classList.remove('d-none');
+}
+function hideError() { document.getElementById('errorBox').classList.add('d-none'); }
+</script>
+{% endblock %}

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}中上級者認定テスト{% endblock %}</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/bootstrap-icons.css" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #1a3a5c;
+      --accent: #e85d1a;
+      --success: #1a6e3c;
+      --bg-light: #f7f9fc;
+    }
+    body { background: var(--bg-light); font-family: 'Noto Sans JP', 'Segoe UI', sans-serif; color: #0f172a; }
+    /* ── Unified Header ── */
+    .site-header {
+      background: #ffffff;
+      border-bottom: 1px solid #e5e7eb;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .site-header .header-inner {
+      max-width: 1320px;
+      margin: 0 auto;
+      padding: 0 32px;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .site-header .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+    .site-header .logo-icon {
+      width: 34px; height: 34px;
+      border: 2px solid #1a3a5c;
+      border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      color: #1a3a5c; font-size: 16px;
+    }
+    .site-header .logo-text {
+      font-size: 18px; font-weight: 800; color: #1a3a5c;
+    }
+    .site-header nav { display: flex; gap: 32px; align-items: center; }
+    .site-header nav a {
+      text-decoration: none;
+      color: #64748b;
+      font-weight: 600;
+      font-size: 14px;
+      transition: color .2s;
+    }
+    .site-header nav a:hover { color: #1a3a5c; }
+    .site-header nav a.active { color: #1a3a5c; font-weight: 700; }
+    /* ── Content ── */
+    .page-body { max-width: 1320px; margin: 0 auto; padding: 32px 32px 60px; }
+    .card { border: none; box-shadow: 0 2px 12px rgba(0,0,0,.08); }
+    .badge-cert-S { background: #1a6e3c; }
+    .badge-cert-A { background: #1a4e8c; }
+    .badge-cert-B { background: #5a7a1a; }
+    .badge-cert-C { background: #8c2a1a; }
+    .score-bar-track { background: #dee2e6; border-radius: 6px; height: 12px; }
+    .score-bar-fill { height: 12px; border-radius: 6px; transition: width .6s ease; }
+    .question-card { border-left: 4px solid var(--primary); }
+    .footer-bar { border-top: 1px solid #e5e7eb; color: #94a3b8; font-size: .8rem; padding: 1.2rem 0; margin-top: 3rem; text-align: center; }
+  </style>
+  {% block extra_head %}{% endblock %}
+  <style>
+    @media print {
+      .site-header, .footer-bar, a.btn { display: none !important; }
+      .card { box-shadow: none !important; border: 1px solid #dee2e6 !important; }
+      body { background: #fff !important; }
+    }
+  </style>
+</head>
+<body>
+<header class="site-header">
+  <div class="header-inner">
+    <a class="logo" href="/">
+      <div class="logo-icon"><i class="bi bi-shield-check"></i></div>
+      <span class="logo-text">中上級者認定テスト</span>
+    </a>
+    <nav>
+      <a href="/exam/new">試験登録</a>
+      <a href="/exam/list">試験一覧</a>
+      <a href="/sessions">採点結果</a>
+      <a href="/guide">使い方</a>
+    </nav>
+  </div>
+</header>
+<div class="page-body">
+  {% block content %}{% endblock %}
+</div>
+<div class="footer-bar">
+  &copy; 中上級者認定テスト — Powered by Claude AI
+</div>
+<script src="/static/js/bootstrap.bundle.min.js"></script>
+{% block scripts %}{% endblock %}
+</body>
+</html>

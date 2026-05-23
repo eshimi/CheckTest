@@ -1,0 +1,393 @@
+{% extends "base.html" %}
+{% block title %}使い方ガイド | 中上級者認定テスト{% endblock %}
+
+{% block extra_head %}
+<style>
+.guide-hero {
+  background: linear-gradient(135deg, #1a3a5c 0%, #0f2540 100%);
+  color: #fff;
+  border-radius: 16px;
+  padding: 40px 48px;
+  margin-bottom: 40px;
+}
+.guide-hero h1 { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+.guide-hero p  { font-size: 15px; color: #b0c4dc; margin: 0; }
+
+.step-wrap {
+  display: flex;
+  gap: 32px;
+  align-items: flex-start;
+  margin-bottom: 48px;
+}
+.step-wrap.reverse { flex-direction: row-reverse; }
+
+.step-text { flex: 1; }
+.step-num {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px; height: 36px;
+  border-radius: 50%;
+  background: #1a3a5c;
+  color: #fff;
+  font-weight: 800;
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+.step-text h2 { font-size: 20px; font-weight: 800; color: #0f172a; margin-bottom: 8px; }
+.step-text p  { font-size: 14px; color: #475569; line-height: 1.8; margin-bottom: 12px; }
+.step-text ul { font-size: 14px; color: #475569; line-height: 2; padding-left: 20px; }
+
+.step-img { flex: 1; }
+
+/* ── UI Mockups ── */
+.mockup {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(15,23,42,.08);
+  overflow: hidden;
+}
+.mockup-bar {
+  background: #1a3a5c;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  padding: 0 14px;
+  gap: 6px;
+}
+.mockup-bar span {
+  width: 10px; height: 10px; border-radius: 50%;
+  display: inline-block;
+}
+.mockup-bar .r { background: #ff5f57; }
+.mockup-bar .y { background: #febc2e; }
+.mockup-bar .g { background: #28c840; }
+.mockup-body { padding: 20px; }
+
+/* Step1 mockup */
+.m-field { margin-bottom: 12px; }
+.m-label { font-size: 11px; font-weight: 700; color: #64748b; margin-bottom: 4px; }
+.m-input {
+  border: 1px solid #cbd5e1; border-radius: 6px;
+  padding: 6px 10px; font-size: 12px; color: #334155;
+  background: #f8fafc;
+}
+.m-row { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+.m-badge {
+  background: #eff6ff; color: #1a3a5c;
+  border: 1px solid #bfdbfe;
+  border-radius: 6px; padding: 3px 8px; font-size: 11px; font-weight: 700;
+}
+.m-btn {
+  background: #1a3a5c; color: #fff;
+  border-radius: 8px; padding: 8px 18px;
+  font-size: 12px; font-weight: 700;
+  display: inline-block; margin-top: 8px;
+}
+
+/* Step2 mockup */
+.m-upload {
+  border: 2px dashed #94a3b8;
+  border-radius: 10px;
+  padding: 24px;
+  text-align: center;
+  background: #f8fafc;
+}
+.m-upload-icon { font-size: 28px; color: #1a3a5c; margin-bottom: 8px; }
+.m-upload h3 { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+.m-upload p  { font-size: 11px; color: #64748b; margin: 0; }
+.m-exam-item {
+  border: 1px solid #e2e8f0; border-radius: 8px;
+  padding: 10px 14px; margin-bottom: 8px;
+  display: flex; align-items: center; gap: 10px;
+  background: #eff6ff; border-color: #1a3a5c;
+}
+.m-exam-icon { color: #1a3a5c; font-size: 18px; }
+.m-exam-name { font-size: 12px; font-weight: 700; color: #1e293b; }
+.m-exam-sub  { font-size: 11px; color: #64748b; }
+
+/* Step3 mockup */
+.m-progress-wrap { text-align: center; padding: 16px 0; }
+.m-spinner {
+  width: 40px; height: 40px;
+  border: 4px solid #e2e8f0;
+  border-top-color: #1a3a5c;
+  border-radius: 50%;
+  margin: 0 auto 12px;
+}
+.m-progress-text { font-size: 13px; font-weight: 700; color: #1e293b; margin-bottom: 4px; }
+.m-progress-sub  { font-size: 11px; color: #64748b; }
+.m-bar-track { background: #e2e8f0; border-radius: 6px; height: 8px; margin-top: 16px; }
+.m-bar-fill  { background: #1a3a5c; border-radius: 6px; height: 8px; width: 65%; }
+
+/* Step4 mockup - results */
+.m-result-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px;
+  background: #f8fafc; border: 1px solid #e2e8f0;
+  margin-bottom: 6px;
+}
+.m-result-name { font-size: 12px; font-weight: 700; color: #1e293b; flex: 1; }
+.m-result-pct  { font-size: 13px; font-weight: 800; color: #1a3a5c; min-width: 52px; text-align: right; }
+.m-cert-s { background: #1a6e3c; color: #fff; border-radius: 4px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
+.m-cert-a { background: #1a4e8c; color: #fff; border-radius: 4px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
+.m-cert-b { background: #5a7a1a; color: #fff; border-radius: 4px; padding: 2px 7px; font-size: 10px; font-weight: 700; }
+
+/* Step5 mockup - report */
+.m-report-header {
+  border-bottom: 3px solid #1a3a5c;
+  padding-bottom: 10px; margin-bottom: 12px;
+}
+.m-report-title { font-size: 14px; font-weight: 800; color: #1a3a5c; margin-bottom: 2px; }
+.m-report-sub   { font-size: 10px; color: #64748b; }
+.m-report-pct   { font-size: 22px; font-weight: 900; color: #1a3a5c; }
+.m-section-label {
+  background: #eef2f7; color: #1a3a5c;
+  font-size: 11px; font-weight: 700;
+  padding: 4px 8px; border-radius: 4px;
+  margin-bottom: 6px;
+}
+.m-comp-row {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 11px; margin-bottom: 4px; color: #334155;
+}
+.m-comp-bar-track { flex: 1; background: #e2e8f0; border-radius: 3px; height: 6px; }
+.m-comp-bar-fill  { background: #1a6e3c; border-radius: 3px; height: 6px; }
+
+.divider {
+  border: none; border-top: 2px solid #e2e8f0;
+  margin: 40px 0;
+}
+
+.tip-box {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 16px 20px;
+  font-size: 13px;
+  color: #1e40af;
+  margin-bottom: 12px;
+}
+.tip-box i { margin-right: 6px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="guide-hero">
+  <h1><i class="bi bi-book-half me-2"></i>使い方ガイド</h1>
+  <p>AI自動採点システムの基本的な使い方を、ステップごとにご説明します。</p>
+</div>
+
+<!-- ── Step 1 ── -->
+<div class="step-wrap">
+  <div class="step-text">
+    <div class="step-num">1</div>
+    <h2>試験問題を事前登録する</h2>
+    <p>採点に使う問題・設問・採点基準をシステムに登録します。一度登録すれば、次回以降は選択するだけで使えます。</p>
+    <ul>
+      <li>ナビバーの <strong>試験一覧</strong> → <strong>試験問題を事前登録</strong> をクリック</li>
+      <li>試験名・ジャンル・設問ごとの採点観点（コンピテンシー）を入力</li>
+      <li>登録後、トップページから試験を選択できるようになります</li>
+    </ul>
+  </div>
+  <div class="step-img">
+    <div class="mockup">
+      <div class="mockup-bar"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+      <div class="mockup-body">
+        <div class="m-field">
+          <div class="m-label">試験名</div>
+          <div class="m-input">2026年度防災認定プログラム（中上級）</div>
+        </div>
+        <div class="m-field">
+          <div class="m-label">ジャンル / グループ</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap">
+            <span class="m-badge">情報統括班</span>
+            <span class="m-badge">危機管理室</span>
+            <span class="m-badge">広報班</span>
+            <span class="m-badge" style="background:#f1f5f9;color:#94a3b8;border-color:#e2e8f0">+ 追加</span>
+          </div>
+        </div>
+        <div class="m-field">
+          <div class="m-label">設問ごとの採点観点（コンピテンシー）</div>
+          <div class="m-row"><span class="m-badge">情報収集</span><span class="m-badge">情報分析</span><span class="m-badge">計画</span></div>
+        </div>
+        <div class="m-btn">登録する</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ── Step 2 ── -->
+<div class="step-wrap reverse">
+  <div class="step-text">
+    <div class="step-num">2</div>
+    <h2>回答ファイルをアップロードする</h2>
+    <p>受験者の回答が入ったCSV / XLSXファイルをトップページからアップロードします。</p>
+    <ul>
+      <li>トップページで使用する試験を選択</li>
+      <li>「ファイルを選択」または枠内へドラッグ＆ドロップ</li>
+      <li>「アップロードして確認する」をクリックして採点を開始</li>
+    </ul>
+    <div class="tip-box">
+      <i class="bi bi-info-circle-fill"></i>
+      列名は <strong>受験者ID / 氏名 / 所属部署 / Q1 / Q2…</strong> の形式。問題IDと列名が一致している必要があります。
+    </div>
+  </div>
+  <div class="step-img">
+    <div class="mockup">
+      <div class="mockup-bar"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+      <div class="mockup-body">
+        <div style="margin-bottom:12px">
+          <div class="m-label" style="margin-bottom:6px">使用する試験</div>
+          <div class="m-exam-item">
+            <i class="bi bi-file-text-fill m-exam-icon"></i>
+            <div>
+              <div class="m-exam-name">2026年度防災認定プログラム（中上級）</div>
+              <div class="m-exam-sub">22問 ／ 登録日：2026-05-15</div>
+            </div>
+          </div>
+        </div>
+        <div class="m-upload">
+          <div class="m-upload-icon"><i class="bi bi-cloud-arrow-up"></i></div>
+          <h3>ファイルを選択 または ドラッグ＆ドロップ</h3>
+          <p>CSV / XLSX に対応</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ── Step 3 ── -->
+<div class="step-wrap">
+  <div class="step-text">
+    <div class="step-num">3</div>
+    <h2>AIが自動で採点する</h2>
+    <p>アップロード後、Claude AI が受験者の回答を自動で採点します。受験者数によりますが、通常数分で完了します。</p>
+    <ul>
+      <li>採点中はそのままお待ちください</li>
+      <li>完了すると採点結果一覧ページへ自動的に移動します</li>
+      <li>同じ試験データを再アップロードすると、新しいセッションとして追加保存されます</li>
+    </ul>
+  </div>
+  <div class="step-img">
+    <div class="mockup">
+      <div class="mockup-bar"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+      <div class="mockup-body">
+        <div class="m-progress-wrap">
+          <div class="m-spinner"></div>
+          <div class="m-progress-text">Claude AI が採点中です…</div>
+          <div class="m-progress-sub">受験者の回答を分析しています。しばらくお待ちください。</div>
+          <div class="m-bar-track"><div class="m-bar-fill"></div></div>
+          <div style="font-size:11px;color:#94a3b8;margin-top:8px">8 / 12名 完了</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ── Step 4 ── -->
+<div class="step-wrap reverse">
+  <div class="step-text">
+    <div class="step-num">4</div>
+    <h2>採点結果一覧を確認する</h2>
+    <p>採点完了後、受験者ごとの得点率・認定レベルが一覧表示されます。ナビの <strong>採点結果</strong> からいつでも閲覧できます。</p>
+    <ul>
+      <li>得点率・認定レベル（S / A / B / C）が一覧表示</li>
+      <li>ジャンル・グループ別にフィルタリング可能</li>
+      <li>受験者名をクリックで個別レポートへ</li>
+    </ul>
+  </div>
+  <div class="step-img">
+    <div class="mockup">
+      <div class="mockup-bar"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+      <div class="mockup-body">
+        <div class="m-result-row">
+          <div class="m-result-name">tak********da</div>
+          <span class="m-cert-s">S</span>
+          <div class="m-result-pct">116.7%</div>
+        </div>
+        <div class="m-result-row">
+          <div class="m-result-name">yam********ro</div>
+          <span class="m-cert-a">A</span>
+          <div class="m-result-pct">88.3%</div>
+        </div>
+        <div class="m-result-row">
+          <div class="m-result-name">nak********ko</div>
+          <span class="m-cert-b">B</span>
+          <div class="m-result-pct">61.5%</div>
+        </div>
+        <div style="font-size:11px;color:#94a3b8;margin-top:10px;text-align:right">全12名 ／ 平均 82.4%</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ── Step 5 ── -->
+<div class="step-wrap">
+  <div class="step-text">
+    <div class="step-num">5</div>
+    <h2>個別レポートをダウンロードする</h2>
+    <p>各受験者の個別フィードバックシートをWord・PDFで出力できます。受験者へのフィードバック資料としてご活用ください。</p>
+    <ul>
+      <li><strong>Word DL</strong>：編集可能なWordファイルを出力</li>
+      <li><strong>印刷（PDF）</strong>：ブラウザの印刷機能でPDF保存</li>
+      <li>総評・コンピテンシーごとの評価・改善提案・設問別採点結果を含む</li>
+    </ul>
+  </div>
+  <div class="step-img">
+    <div class="mockup">
+      <div class="mockup-bar"><span class="r"></span><span class="y"></span><span class="g"></span></div>
+      <div class="mockup-body">
+        <div class="m-report-header">
+          <div class="m-report-title">認定プログラムフィードバックシート</div>
+          <div class="m-report-sub">tak********da 様　｜　グループID: 危機管理室　｜　ジャンル: 情報統括班</div>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <div style="font-size:10px;color:#64748b">総合得点率</div>
+            <div class="m-report-pct">116.7%</div>
+            <div style="font-size:10px;color:#64748b">119 / 102点</div>
+          </div>
+          <div style="width:80px;height:80px;border-radius:50%;border:6px solid #1a6e3c;display:flex;align-items:center;justify-content:center">
+            <span style="font-size:11px;font-weight:800;color:#1a6e3c">S級</span>
+          </div>
+        </div>
+        <div class="m-section-label">2. コンピテンシーごとの評価</div>
+        <div class="m-comp-row">
+          <span style="min-width:70px">ｺﾐｭﾆｹｰｼｮﾝ</span>
+          <div class="m-comp-bar-track"><div class="m-comp-bar-fill" style="width:90%"></div></div>
+          <span>127%</span>
+        </div>
+        <div class="m-comp-row">
+          <span style="min-width:70px">情報収集</span>
+          <div class="m-comp-bar-track"><div class="m-comp-bar-fill" style="width:85%"></div></div>
+          <span>125%</span>
+        </div>
+        <div class="m-comp-row">
+          <span style="min-width:70px">計画</span>
+          <div class="m-comp-bar-track"><div class="m-comp-bar-fill" style="width:80%"></div></div>
+          <span>115%</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<div class="text-center mb-4">
+  <a href="/" class="btn btn-lg text-white fw-bold px-5" style="background:#1a3a5c;border-radius:12px">
+    <i class="bi bi-cloud-arrow-up me-2"></i>採点をはじめる
+  </a>
+</div>
+
+{% endblock %}

@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}採点結果一覧 | 中上級者認定テスト{% endblock %}
+
+{% block extra_head %}
+<style>
+.comp-mini { font-size:.7rem; padding:.1em .4em; border-radius:3px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h2 class="fw-bold mb-0" style="color:var(--primary)"><i class="bi bi-list-check me-2"></i>採点結果一覧</h2>
+    <p class="text-muted small mb-0">受験者数: {{ results|length }}名</p>
+  </div>
+  <a href="/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>新しい採点</a>
+</div>
+
+<!-- 全体サマリー -->
+{% set avg_pct = (results | map(attribute='percentage') | list | sum / results|length) | round(1) %}
+{% set avg_score = (results | map(attribute='total_score') | list | sum / results|length) | round(1) %}
+{% set max_pct = results | map(attribute='percentage') | list | max %}
+{% set min_pct = results | map(attribute='percentage') | list | min %}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3 h-100">
+      <div class="fs-2 fw-bold" style="color:var(--primary)">{{ results|length }}</div>
+      <div class="text-muted small">受験者数</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3 h-100">
+      <div class="fs-2 fw-bold" style="color:var(--primary)">{{ avg_pct }}%</div>
+      <div class="text-muted small">全体平均得点率</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3 h-100">
+      <div class="fs-2 fw-bold text-success">{{ max_pct }}%</div>
+      <div class="text-muted small">最高得点率</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3 h-100">
+      <div class="fs-2 fw-bold text-danger">{{ min_pct }}%</div>
+      <div class="text-muted small">最低得点率</div>
+    </div>
+  </div>
+</div>
+
+<!-- コンピテンシー別平均 -->
+{% if comp_averages %}
+<div class="card mb-4">
+  <div class="card-header fw-bold py-2" style="background:#e8eef5;color:var(--primary)">
+    <i class="bi bi-bar-chart me-2"></i>全体コンピテンシー別平均達成率
+  </div>
+  <div class="card-body pb-2">
+    <div class="row g-3">
+      {% for comp, avg in comp_averages.items() %}
+      <div class="col-md-4 col-lg" style="min-width:160px">
+        <div class="small fw-bold mb-1">{{ comp }}</div>
+        <div class="d-flex align-items-center gap-2">
+          <div class="flex-grow-1" style="background:#e9ecef;border-radius:6px;height:14px">
+            <div style="width:{{ [avg, 100] | min }}%;height:14px;border-radius:6px;
+              background:{% if avg >= 75 %}var(--success){% elif avg >= 50 %}#5a7a1a{% else %}#8c2a1a{% endif %};
+              transition:width .7s ease"></div>
+          </div>
+          <span class="small fw-bold" style="min-width:3rem;text-align:right">{{ avg }}%</span>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ジャンル別タブ -->
+{% if genres | length > 1 %}
+<div class="mb-3">
+  <div class="d-flex flex-wrap gap-2 align-items-center">
+    <span class="text-muted small fw-bold me-1">ジャンル：</span>
+    <button class="btn btn-sm btn-primary genre-filter active" data-genre="all">すべて ({{ results|length }})</button>
+    {% for g in genres %}
+    <button class="btn btn-sm btn-outline-primary genre-filter" data-genre="{{ g }}">
+      {{ g }} ({{ results | selectattr('genre', 'eq', g) | list | length }})
+    </button>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+<!-- 結果テーブル -->
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table table-hover align-middle mb-0" id="resultsTable">
+      <thead style="background:var(--primary);color:#fff;">
+        <tr>
+          <th class="ps-3">氏名</th>
+          <th>ジャンル</th>
+          <th>グループID</th>
+          <th class="text-center">得点</th>
+          <th class="text-center" style="min-width:140px">得点率</th>
+          {% if competency_cols %}
+          {% for c in competency_cols %}
+          <th class="text-center small" style="min-width:80px">{{ c }}</th>
+          {% endfor %}
+          {% endif %}
+          <th class="text-center">操作</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in results | sort(attribute='percentage', reverse=True) %}
+        <tr class="result-row" data-genre="{{ r.genre }}">
+          <td class="ps-3 fw-bold">{{ r.id | mask_id }}</td>
+          <td><span class="badge bg-secondary">{{ r.genre or '—' }}</span></td>
+          <td class="small text-muted">{{ r.department }}</td>
+          <td class="text-center small">{{ r.total_score }}/{{ r.total_max }}</td>
+          <td class="text-center" style="min-width:140px">
+            <div style="background:#dee2e6;border-radius:5px;height:10px">
+              <div style="width:{{ [r.percentage, 100] | min }}%;height:10px;border-radius:5px;
+                background:{% if r.percentage >= 75 %}var(--success){% elif r.percentage >= 60 %}#5a7a1a{% else %}#8c2a1a{% endif %}"></div>
+            </div>
+            <small>{{ r.percentage }}%</small>
+          </td>
+          {% if competency_cols %}
+          {% for c in competency_cols %}
+          {% set rate = r.comp_rates.get(c, 0) %}
+          <td class="text-center">
+            <span class="comp-mini fw-bold"
+              style="background:{% if rate >= 75 %}#d4edda{% elif rate >= 50 %}#fff3cd{% else %}#f8d7da{% endif %};
+                     color:{% if rate >= 75 %}#1a6e3c{% elif rate >= 50 %}#856404{% else %}#8c2a1a{% endif %}">
+              {{ rate }}%
+            </span>
+          </td>
+          {% endfor %}
+          {% endif %}
+          <td class="text-center">
+            <a href="/report/{{ session_id }}/{{ r.id }}" class="btn btn-sm btn-outline-primary" target="_blank">
+              <i class="bi bi-eye me-1"></i>レポート
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ジャンル別サマリー -->
+{% if genre_summaries %}
+<h5 class="fw-bold mt-4 mb-3" style="color:var(--primary)"><i class="bi bi-diagram-3 me-2"></i>ジャンル別サマリー</h5>
+<div class="row g-3">
+  {% for g, gs in genre_summaries.items() %}
+  <div class="col-md-6 col-lg-4">
+    <div class="card h-100">
+      <div class="card-header py-2 fw-bold" style="background:#e8eef5;color:var(--primary)">
+        {{ g }} <span class="text-muted fw-normal small">（{{ gs.count }}名）</span>
+      </div>
+      <div class="card-body py-2">
+        <div class="d-flex justify-content-between small mb-2">
+          <span>平均得点率</span>
+          <span class="fw-bold">{{ gs.avg_pct }}%</span>
+        </div>
+        <div class="d-flex justify-content-between small mb-2">
+          <span>最高 / 最低</span>
+          <span class="fw-bold">{{ gs.max_pct }}% / {{ gs.min_pct }}%</span>
+        </div>
+        {% for c, avg in gs.comp_avgs.items() %}
+        <div class="d-flex align-items-center gap-2 mb-1">
+          <span class="small text-muted" style="min-width:7rem;font-size:.7rem">{{ c }}</span>
+          <div class="flex-grow-1" style="background:#e9ecef;border-radius:4px;height:8px">
+            <div style="width:{{ [avg, 100] | min }}%;height:8px;border-radius:4px;
+              background:{% if avg >= 75 %}var(--success){% elif avg >= 50 %}#5a7a1a{% else %}#8c2a1a{% endif %}"></div>
+          </div>
+          <span style="font-size:.7rem;min-width:2.5rem;text-align:right">{{ avg }}%</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll('.genre-filter').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('.genre-filter').forEach(b => b.classList.replace('btn-primary','btn-outline-primary'));
+    document.querySelectorAll('.genre-filter').forEach(b => b.classList.remove('active'));
+    btn.classList.replace('btn-outline-primary','btn-primary');
+    btn.classList.add('active');
+    const genre = btn.dataset.genre;
+    document.querySelectorAll('.result-row').forEach(row => {
+      row.style.display = (genre === 'all' || row.dataset.genre === genre) ? '' : 'none';
+    });
+  });
+});
+</script>
+{% endblock %}
