@@ -508,6 +508,28 @@
       <a href="/static/sample_answers.xlsx"><i class="bi bi-file-earmark-spreadsheet"></i> 回答サンプル</a>
     </div>
 
+    <!-- 列マッピング確認 -->
+    <div class="card mapping-card d-none" id="mappingSection" style="margin-top:24px">
+      <div class="section-title">
+        <h2>列マッピングの確認</h2>
+      </div>
+      <div class="alert-info-box d-none" id="previewInfo"></div>
+      <div id="mappingForm"></div>
+      <button class="grade-button" onclick="doGrade()">
+        <i class="bi bi-cpu-fill"></i> 採点を実行する
+      </button>
+    </div>
+
+    <!-- 進捗 -->
+    <div class="card progress-card d-none" id="progressSection" style="margin-top:24px">
+      <div class="spinner"></div>
+      <h5>AI採点を実行中です…</h5>
+      <p>受験者全員の採点が完了するまでしばらくお待ちください。<br>この画面はそのままにしておいてください。</p>
+    </div>
+
+    <!-- エラー -->
+    <div class="error-card d-none" id="errorSection" style="margin-top:16px"></div>
+
   </div>
 </main>
 
