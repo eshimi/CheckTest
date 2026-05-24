@@ -128,11 +128,11 @@ def load_excel(filepath):
                 continue
             seen.add(enc)
             try:
-                return pd.read_csv(fp, encoding=enc)
+                # sep=None + engine='python' で区切り文字を自動検出
+                return pd.read_csv(fp, encoding=enc, sep=None, engine="python")
             except (UnicodeDecodeError, ValueError):
                 continue
-        # latin-1 never raises UnicodeDecodeError — this line is a safety net
-        return pd.read_csv(fp, encoding="latin-1")
+        return pd.read_csv(fp, encoding="latin-1", sep=None, engine="python")
     return pd.read_excel(fp)
 
 
