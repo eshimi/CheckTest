@@ -1,6 +1,12 @@
 import io
 import os
 import json
+import glob as _glob
+
+# grader.py のバイトコードキャッシュを起動時に削除する（古い .pyc が使われるのを防ぐ）
+for _pyc in _glob.glob(os.path.join(os.path.dirname(__file__), "__pycache__", "grader.cpython-*.pyc")):
+    os.remove(_pyc)
+
 import uuid
 import datetime
 import base64
@@ -355,8 +361,10 @@ def upload():
 
 @app.route("/grade", methods=["POST"])
 def grade():
+    print("[GRADE] called", flush=True)
     data = request.get_json()
     session_id = data.get("session_id")
+    print(f"[GRADE] session_id={session_id}", flush=True)
     column_mapping = data.get("column_mapping", {})
 
     if not session_id:
@@ -369,13 +377,14 @@ def grade():
 
     answers_df = load_excel(a_files[0])
 
-    # 縦型フォーマット（LMSエクスポート）は問題ファイル不要 — バックグラウンドで採点
+    # 縦型フォーマット（LMSエクスポート）はバックグラウンドで採点
     if is_tall_format(answers_df):
         merged_mapping = column_mapping or {
             "a_id": "ログインID", "a_name": "名前",
             "a_dept": "グループ", "a_genre": "属性",
             "q_text_col": "問題文", "a_text_col": "解答", "unit_col": "ユニット",
         }
+
         results_dir = RESULTS_DIR / session_id
         results_dir.mkdir(parents=True, exist_ok=True)
         progress_path = results_dir / "progress.json"
@@ -384,10 +393,13 @@ def grade():
 
         def _bg_grade(df, mapping, rdir, sid, ppath):
             try:
+                import importlib, grader as _gmod
+                importlib.reload(_gmod)
+                _grade_fn = _gmod.grade_tall_format
                 def cb(done, total, name):
                     with open(ppath, "w", encoding="utf-8") as fp:
                         json.dump({"status": "processing", "done": done, "total": total, "current": name}, fp, ensure_ascii=False)
-                results = grade_tall_format(df, mapping, rdir, progress_cb=cb)
+                results = _grade_fn(df, mapping, rdir, progress_cb=cb)
                 with open(rdir / "summary.json", "w", encoding="utf-8") as fp:
                     json.dump(results, fp, ensure_ascii=False, indent=2)
                 with open(ppath, "w", encoding="utf-8") as fp:
@@ -407,10 +419,15 @@ def grade():
         with open(ref_path, encoding="utf-8") as f:
             ref = json.load(f)
         exam_id = ref["exam_id"]
-        q_files = list((EXAMS_DIR / exam_id).glob("questions.*")) or \
-                  list((EXAMS_DIR / exam_id).glob("source.*"))
+        exam_dir = EXAMS_DIR / exam_id
+        q_files = list(exam_dir.glob("questions.*")) or \
+                  list(exam_dir.glob("source.*")) or \
+                  [f for f in (exam_dir.iterdir() if exam_dir.exists() else [])
+                   if f.suffix.lower() in ('.xlsx', '.csv', '.xls')]
+        print(f"[DEBUG] exam_dir={exam_dir} exists={exam_dir.exists()} q_files={q_files}", flush=True)
         if not q_files:
-            return jsonify({"error": "試験設定の問題ファイルが見つかりません"}), 404
+            existing = [p.name for p in exam_dir.iterdir()] if exam_dir.exists() else []
+            return jsonify({"error": f"試験設定の問題ファイルが見つかりません (exam_id={exam_id}, files={existing})"}), 404
         meta_path = EXAMS_DIR / exam_id / "meta.json"
         with open(meta_path, encoding="utf-8") as f:
             meta = json.load(f)
@@ -895,7 +912,11 @@ def results_list(session_id):
         return "結果が見つかりません", 404
     with open(summary_path, encoding="utf-8") as f:
         results = json.load(f)
-    competency_cols = results[0].get("competency_cols", []) if results else []
+    # Union of all competency_cols across results (not just first person)
+    _COMP_ORDER = ['コミュニケーション', '情報収集', '情報分析', '想像・先読み', '計画']
+    all_comp_set = {c for r in results for c in r.get("competency_cols", [])}
+    competency_cols = [c for c in _COMP_ORDER if c in all_comp_set] + \
+                      [c for c in sorted(all_comp_set) if c not in _COMP_ORDER]
     genres = sorted({r.get("genre", "") for r in results if r.get("genre")})
     # 全体コンピテンシー平均
     comp_averages = {}

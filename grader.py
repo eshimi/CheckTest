@@ -116,6 +116,7 @@ def grade_single(question_text, rubrics_per_comp, answer, competencies,
     response = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=2048,
+        temperature=0,
         system=[{"type": "text", "text": SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": prompt}]
     )
@@ -124,18 +125,40 @@ def grade_single(question_text, rubrics_per_comp, answer, competencies,
         raw = raw.split("```")[1]
         if raw.startswith("json"):
             raw = raw[4:]
-    result = json.loads(raw.strip())
+    raw = raw.strip()
+    # JSON部分だけをパース（余分なテキストを無視）
+    brace_start = raw.find('{')
+    if brace_start == -1:
+        raise ValueError(f"JSONオブジェクトが見つかりません: {raw[:200]}")
+    try:
+        result, _ = json.JSONDecoder().raw_decode(raw, brace_start)
+    except json.JSONDecodeError:
+        brace_end = raw.rfind('}')
+        result = json.loads(raw[brace_start:brace_end + 1])
 
     # 強制0点処理
     if result.get("forced_zero", False):
         result["competency_scores"] = {c: 0 for c in competencies}
     else:
-        result["competency_scores"] = {
-            k: max(0, min(3, int(v))) for k, v in result["competency_scores"].items()
-        }
+        # Claudeが返すキー名を正規化（想像・先読み力 → 想像・先読み など）
+        raw_scores = result["competency_scores"]
+        normalized = {}
+        for k, v in raw_scores.items():
+            canonical = _COMP_NAME_MAP.get(k.strip(), k.strip())
+            normalized[canonical] = max(0, min(3, int(v)))
+        # competencies にあるがClaudeが返さなかった場合は0点
+        for c in competencies:
+            if c not in normalized:
+                normalized[c] = 0
+        result["competency_scores"] = normalized
     result.setdefault("forced_zero", False)
     result.setdefault("forced_zero_reason", "")
-    result.setdefault("competency_reasons", {})
+    # competency_reasons のキーも正規化
+    raw_reasons = result.get("competency_reasons", {})
+    result["competency_reasons"] = {
+        _COMP_NAME_MAP.get(k.strip(), k.strip()): v
+        for k, v in raw_reasons.items()
+    }
     return result
 
 
@@ -365,6 +388,8 @@ def grade_exam(questions_df, answers_df, column_mapping, results_dir):
 
 import re as _re
 
+print("=== GRADER VERSION 2026-05-24-B LOADED ===", flush=True)
+
 _COMP_NAME_MAP = {
     'コミュニケーション力': 'コミュニケーション',
     'コミュニケーション':   'コミュニケーション',
@@ -375,6 +400,9 @@ _COMP_NAME_MAP = {
     '想像・先読み力':       '想像・先読み',
     '想像先読み力':         '想像・先読み',
     '想像・先読み':         '想像・先読み',
+    '想像':                 '想像・先読み',
+    '先読み力':             '想像・先読み',
+    '先読み':               '想像・先読み',
     '計画力':               '計画',
     '計画':                 '計画',
 }
@@ -383,15 +411,22 @@ _ALL_COMPS     = ['コミュニケーション', '情報収集', '情報分析',
 
 
 def _extract_comps(q_text: str) -> list:
-    m = _re.search(r'※評価対象\s*コンピテンシー[：:]\s*(.+?)(?:\n|$)', q_text)
+    m = _re.search(r'※評価対象\s*コンピテンシー[：:]\s*(.+?)(?:\r?\n|$)', q_text)
     if not m:
         return _DEFAULT_COMPS[:]
-    parts = _re.split(r'[、,，・]', m.group(1).strip())
+    ann = m.group(1).strip()
     result = []
-    for p in parts:
-        mapped = _COMP_NAME_MAP.get(p.strip())
-        if mapped and mapped not in result:
-            result.append(mapped)
+    # 文字コードに依存しない内容ベースの判定
+    if 'コミュニケーション' in ann and 'コミュニケーション' not in result:
+        result.append('コミュニケーション')
+    if '情報収集' in ann and '情報収集' not in result:
+        result.append('情報収集')
+    if '情報分析' in ann and '情報分析' not in result:
+        result.append('情報分析')
+    if '想像' in ann and '先読み' in ann and '想像・先読み' not in result:
+        result.append('想像・先読み')
+    if '計画' in ann and '計画' not in result:
+        result.append('計画')
     return result if result else _DEFAULT_COMPS[:]
 
 
@@ -449,6 +484,19 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb
     縦型フォーマット採点（1行 = 1問の回答、LMSエクスポート形式）
     問題文・解答が同一ファイルに含まれるため、問題ファイル不要。
     """
+    import datetime as _dt
+    _log_path = Path(results_dir) / "grade_debug.log"
+    def _dlog(msg):
+        try:
+            with open(str(_log_path), 'a', encoding='utf-8') as _f:
+                _f.write(f"[{_dt.datetime.now().strftime('%H:%M:%S')}] {msg}\n")
+        except Exception as _e:
+            print(f"[DLOG_ERR] {_e}: {msg}", flush=True)
+
+    _selftest = _extract_comps("テスト※評価対象コンピテンシー：想像・先読み力、計画力")
+    _dlog(f"SELF_TEST: {_selftest}")
+    _dlog(f"grader __file__: {__file__}")
+
     cm = column_mapping
     # 列名が文字化けしている場合でも位置ベースでフォールバック
     a_id_col    = _find_col(answers_df, [cm.get("a_id",     "ログインID"), "loginid", "id"],       0)
@@ -490,7 +538,13 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb
             ) else ""
             unit_val = str(row[unit_col]) if unit_col in row.index else ""
 
-            comps   = _extract_comps(raw_q)
+            # メインスレッドで事前抽出されたコンピテンシーマップを優先使用
+            _q_comp_map = cm.get('q_comp_map', {})
+            if raw_q in _q_comp_map:
+                comps = _q_comp_map[raw_q]
+            else:
+                comps = _extract_comps(raw_q)
+            _dlog(f"Q{idx:02d} comps={comps}")
             clean_q = _clean_q(raw_q)
             scene   = _scene(unit_val)
 

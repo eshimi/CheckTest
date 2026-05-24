@@ -17,8 +17,9 @@
 </div>
 
 <!-- 全体サマリー -->
-{% set avg_pct = (results | map(attribute='percentage') | list | sum / results|length) | round(1) %}
-{% set avg_score = (results | map(attribute='total_score') | list | sum / results|length) | round(1) %}
+{% set _n = results|length if results|length > 0 else 1 %}
+{% set avg_pct = (results | map(attribute='percentage') | list | sum / _n) | round(1) %}
+{% set avg_score = (results | map(attribute='total_score') | list | sum / _n) | round(1) %}
 {% set max_pct = results | map(attribute='percentage') | list | max %}
 {% set min_pct = results | map(attribute='percentage') | list | min %}
 <div class="row g-3 mb-4">
