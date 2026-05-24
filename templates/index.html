@@ -631,7 +631,6 @@ function showMapping(data) {
   info.classList.remove('d-none');
 
   const hasSavedMapping = data.mode === 'preset' && data.column_mapping && Object.keys(data.column_mapping).length > 0;
-  const mf = document.getElementById('mappingForm');
 
   if (hasSavedMapping) {
     mf.innerHTML = `<div class="mapping-grid">${buildAnsMapping(data.a_columns)}</div>`;
