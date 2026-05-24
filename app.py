@@ -407,7 +407,8 @@ def grade():
         with open(ref_path, encoding="utf-8") as f:
             ref = json.load(f)
         exam_id = ref["exam_id"]
-        q_files = list((EXAMS_DIR / exam_id).glob("questions.*"))
+        q_files = list((EXAMS_DIR / exam_id).glob("questions.*")) or \
+                  list((EXAMS_DIR / exam_id).glob("source.*"))
         if not q_files:
             return jsonify({"error": "試験設定の問題ファイルが見つかりません"}), 404
         meta_path = EXAMS_DIR / exam_id / "meta.json"
