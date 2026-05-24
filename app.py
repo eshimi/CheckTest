@@ -117,12 +117,22 @@ def allowed_file(filename):
 def load_excel(filepath):
     fp = Path(filepath)
     if fp.suffix.lower() == ".csv":
-        for enc in ("utf-8-sig", "cp932", "shift_jis", "utf-8"):
+        import chardet
+        raw = fp.read_bytes()
+        detected = chardet.detect(raw)
+        enc_detected = detected.get("encoding") or "cp932"
+        candidates = [enc_detected, "utf-8-sig", "cp932", "shift_jis", "utf-8", "latin-1"]
+        seen = set()
+        for enc in candidates:
+            if enc in seen:
+                continue
+            seen.add(enc)
             try:
                 return pd.read_csv(fp, encoding=enc)
             except (UnicodeDecodeError, ValueError):
                 continue
-        raise ValueError("CSVファイルの文字コードを判別できませんでした（UTF-8またはShift-JIS形式でご確認ください）")
+        # latin-1 never raises UnicodeDecodeError — this line is a safety net
+        return pd.read_csv(fp, encoding="latin-1")
     return pd.read_excel(fp)
 
 
