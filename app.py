@@ -553,7 +553,7 @@ def calc_scene_scores(examinee):
         scene = ans.get("question_genre", "その他")
         scores = ans.get("competency_scores", {})
         total = sum(scores.values())
-        mx = len(scores) * 2
+        mx = len(scores) * 3
         scene_totals[scene] = scene_totals.get(scene, 0) + total
         scene_max[scene]    = scene_max.get(scene, 0) + mx
         ct = scene_comp_totals.setdefault(scene, {})

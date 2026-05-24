@@ -257,7 +257,7 @@ def grade_exam_group_based(group_questions: dict, answers_df, column_mapping: di
 
             for c, s in result["competency_scores"].items():
                 comp_totals[c] = comp_totals.get(c, 0) + s
-                comp_max[c]    = comp_max.get(c, 0) + 2
+                comp_max[c]    = comp_max.get(c, 0) + 3
 
         total_score = sum(comp_totals.values())
         total_max   = sum(comp_max.values())
@@ -363,7 +363,7 @@ def grade_exam(questions_df, answers_df, column_mapping, results_dir):
             graded_answers.append(result)
             for c, s in result["competency_scores"].items():
                 comp_totals[c] = comp_totals.get(c, 0) + s
-                comp_max[c]    = comp_max.get(c, 0) + 2
+                comp_max[c]    = comp_max.get(c, 0) + 3
 
         total_score = sum(comp_totals.values())
         total_max   = sum(comp_max.values())
@@ -560,7 +560,7 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb
             for c in comps:
                 s = result["competency_scores"].get(c, 0)
                 comp_totals[c] = comp_totals.get(c, 0) + s
-                comp_max[c]    = comp_max.get(c, 0) + 2
+                comp_max[c]    = comp_max.get(c, 0) + 3
 
             result.update({
                 "question_id":    f"Q{idx:02d}",

@@ -420,7 +420,7 @@
   {% for ans in scene_answers %}
   {% set q_counter.n = q_counter.n + 1 %}
   {% set total_q = ans.competency_scores.values() | sum %}
-  {% set max_q   = ans.competencies | length * 2 %}
+  {% set max_q   = ans.competencies | length * 3 %}
   {% set pct_q   = (total_q / max_q * 100) | round(0) | int if max_q > 0 else 0 %}
 
   <div class="card mb-2 question-card" style="border-radius:0{% if loop.last %} 0 0 8px 8px{% endif %}">
