@@ -418,8 +418,30 @@ def _scene(unit_text: str) -> str:
 def is_tall_format(df) -> bool:
     """問題文と解答が同一ファイルにある縦型フォーマットかどうかを判定"""
     cols = set(df.columns)
-    return ('問題文' in cols and '解答' in cols) or \
-           ('question_text' in cols and 'answer' in cols)
+    # 直接列名で判定
+    if ('問題文' in cols and '解答' in cols):
+        return True
+    if ('question_text' in cols and 'answer' in cols):
+        return True
+    # ヒューリスティック判定:
+    # 先頭列（受験者ID相当）にほぼ同じ値が繰り返されている = 縦型
+    if len(df) >= 10:
+        first_col = df.columns[0]
+        n_unique = df[first_col].dropna().nunique()
+        n_rows   = len(df.dropna(subset=[first_col]))
+        # ユニーク率が25%未満 → 明らかに1行1問の縦型
+        if n_rows > 0 and n_unique / n_rows < 0.25:
+            return True
+    return False
+
+
+def _find_col(df, candidates, fallback_idx=0):
+    """候補列名リストから最初に見つかった列名を返す。なければ位置インデックスで取得。"""
+    for c in candidates:
+        if c in df.columns:
+            return c
+    cols = list(df.columns)
+    return cols[fallback_idx] if fallback_idx < len(cols) else cols[0]
 
 
 def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb=None):
@@ -428,13 +450,14 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb
     問題文・解答が同一ファイルに含まれるため、問題ファイル不要。
     """
     cm = column_mapping
-    a_id_col    = cm.get("a_id",     "ログインID")
-    a_name_col  = cm.get("a_name",   "名前")
-    a_dept_col  = cm.get("a_dept",   "グループ")
-    a_genre_col = cm.get("a_genre",  "属性")
-    q_text_col  = cm.get("q_text_col", "問題文")
-    a_text_col  = cm.get("a_text_col", "解答")
-    unit_col    = cm.get("unit_col",   "ユニット")
+    # 列名が文字化けしている場合でも位置ベースでフォールバック
+    a_id_col    = _find_col(answers_df, [cm.get("a_id",     "ログインID"), "loginid", "id"],       0)
+    a_name_col  = _find_col(answers_df, [cm.get("a_name",   "名前"), "name"],                      1)
+    a_dept_col  = _find_col(answers_df, [cm.get("a_dept",   "グループ"), "group", "dept"],          2)
+    a_genre_col = _find_col(answers_df, [cm.get("a_genre",  "属性"), "genre", "class"],             3)
+    q_text_col  = _find_col(answers_df, [cm.get("q_text_col", "問題文"), "question_text", "問題"],  -3)
+    a_text_col  = _find_col(answers_df, [cm.get("a_text_col", "解答"), "answer", "回答"],           -1)
+    unit_col    = _find_col(answers_df, [cm.get("unit_col", "ユニット"), "unit", "シーン"], 1)
 
     # 有効行に絞る：受験者IDと問題文が存在する行
     df = answers_df.copy()
