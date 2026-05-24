@@ -406,19 +406,22 @@ def grade():
         if gq_paths:
             with open(gq_paths[0], encoding="utf-8") as _f:
                 _gq = json.load(_f)
-            _first_group = next(iter(_gq.values()))
-            _gq_index = {
-                _nq(q['text']): (q.get('active_comps', []), _nfkc_keys(q.get('rubrics', {})))
-                for q in _first_group
-            }
+            # 全グループからインデックスを構築（個別問題はグループごとに問題文が異なるため）
+            _gq_index = {}
+            for _group_qs in _gq.values():
+                for q in _group_qs:
+                    _prefix = _nq(q['text'])
+                    _gq_index[_prefix] = (
+                        [_ud.normalize('NFKC', c) for c in q.get('active_comps', [])],
+                        _nfkc_keys(q.get('rubrics', {}))
+                    )
             q_text_col = merged_mapping.get('q_text_col', '問題文')
             if q_text_col in answers_df.columns:
                 for _raw_q in answers_df[q_text_col].dropna().unique():
                     _prefix = _nq(str(_raw_q))
                     if _prefix in _gq_index:
                         _comps, _rubrics = _gq_index[_prefix]
-                        # active_comps の半角カタカナを全角に正規化
-                        q_comp_map[str(_raw_q)]   = [_ud.normalize('NFKC', c) for c in _comps]
+                        q_comp_map[str(_raw_q)]   = _comps
                         q_rubric_map[str(_raw_q)] = _rubrics
                 print(f"[GRADE] q_comp_map built: {len(q_comp_map)}/{answers_df[q_text_col].dropna().nunique()} questions matched", flush=True)
 
