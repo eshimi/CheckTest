@@ -354,7 +354,7 @@ def grade():
 
     answers_df = load_excel(a_files[0])
 
-    # 縦型フォーマット（LMSエクスポート）は問題ファイル不要 — 先に判定する
+    # 縦型フォーマット（LMSエクスポート）は問題ファイル不要 — バックグラウンドで採点
     if is_tall_format(answers_df):
         merged_mapping = column_mapping or {
             "a_id": "ログインID", "a_name": "名前",
@@ -363,14 +363,28 @@ def grade():
         }
         results_dir = RESULTS_DIR / session_id
         results_dir.mkdir(parents=True, exist_ok=True)
-        try:
-            results = grade_tall_format(answers_df, merged_mapping, results_dir)
-            with open(results_dir / "summary.json", "w", encoding="utf-8") as f:
-                json.dump(results, f, ensure_ascii=False, indent=2)
-            return jsonify({"session_id": session_id, "results": results})
-        except Exception as e:
-            import traceback
-            return jsonify({"error": f"採点処理中にエラーが発生しました: {str(e)}", "detail": traceback.format_exc()}), 500
+        progress_path = results_dir / "progress.json"
+        with open(progress_path, "w", encoding="utf-8") as f:
+            json.dump({"status": "processing", "done": 0, "total": 0, "current": ""}, f)
+
+        def _bg_grade(df, mapping, rdir, sid, ppath):
+            try:
+                def cb(done, total, name):
+                    with open(ppath, "w", encoding="utf-8") as fp:
+                        json.dump({"status": "processing", "done": done, "total": total, "current": name}, fp, ensure_ascii=False)
+                results = grade_tall_format(df, mapping, rdir, progress_cb=cb)
+                with open(rdir / "summary.json", "w", encoding="utf-8") as fp:
+                    json.dump(results, fp, ensure_ascii=False, indent=2)
+                with open(ppath, "w", encoding="utf-8") as fp:
+                    json.dump({"status": "done", "session_id": sid}, fp)
+            except Exception as e:
+                import traceback
+                with open(ppath, "w", encoding="utf-8") as fp:
+                    json.dump({"status": "error", "message": str(e), "detail": traceback.format_exc()}, fp, ensure_ascii=False)
+
+        t = threading.Thread(target=_bg_grade, args=(answers_df, merged_mapping, results_dir, session_id, progress_path), daemon=True)
+        t.start()
+        return jsonify({"session_id": session_id, "status": "processing"})
 
     # 問題ファイルの解決: セッション内 or 事前登録
     ref_path = session_dir / "exam_ref.json"
@@ -814,6 +828,15 @@ def download_report_pdf(session_id, examinee_id):
         download_name=f"採点レポート_{examinee['name']}.pdf",
         mimetype="application/pdf",
     )
+
+
+@app.route("/grade/progress/<session_id>")
+def grade_progress(session_id):
+    progress_path = RESULTS_DIR / session_id / "progress.json"
+    if not progress_path.exists():
+        return jsonify({"status": "unknown"})
+    with open(progress_path, encoding="utf-8") as f:
+        return jsonify(json.load(f))
 
 
 @app.route("/guide")

@@ -422,7 +422,7 @@ def is_tall_format(df) -> bool:
            ('question_text' in cols and 'answer' in cols)
 
 
-def grade_tall_format(answers_df, column_mapping: dict, results_dir):
+def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb=None):
     """
     縦型フォーマット採点（1行 = 1問の回答、LMSエクスポート形式）
     問題文・解答が同一ファイルに含まれるため、問題ファイル不要。
@@ -446,8 +446,10 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir):
     df[a_id_col] = df[a_id_col].astype(str).str.strip()
 
     all_results = []
+    grouped = list(df.groupby(a_id_col, sort=False))
+    total_persons = len(grouped)
 
-    for person_id, person_df in df.groupby(a_id_col, sort=False):
+    for person_idx, (person_id, person_df) in enumerate(grouped, 1):
         first        = person_df.iloc[0]
         person_name  = str(first[a_name_col])  if a_name_col  in first.index else person_id
         person_dept  = str(first[a_dept_col])  if a_dept_col  in first.index else ""
@@ -515,6 +517,9 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir):
             "competency_cols": used_comps,
             "answers":         graded_answers,
         })
+
+        if progress_cb:
+            progress_cb(person_idx, total_persons, person_name)
 
     return all_results
 

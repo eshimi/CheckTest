@@ -695,11 +695,36 @@ async function doGrade() {
       showError(data.error + (data.detail ? '<br><pre style="font-size:11px;margin-top:8px">' + data.detail + '</pre>' : ''));
       return;
     }
-    window.location.href = `/results/${sessionId}`;
+    if (data.status === 'processing') {
+      pollProgress(data.session_id || sessionId);
+    } else {
+      window.location.href = `/results/${sessionId}`;
+    }
   } catch(e) {
     document.getElementById('progressSection').classList.add('d-none');
     showError('採点エラー: ' + e.message);
   }
+}
+
+function pollProgress(sid) {
+  const progCard = document.getElementById('progressSection');
+  const progMsg  = progCard.querySelector('p');
+  const timer = setInterval(async () => {
+    try {
+      const res  = await fetch(`/grade/progress/${sid}`);
+      const data = await res.json();
+      if (data.status === 'done') {
+        clearInterval(timer);
+        window.location.href = `/results/${sid}`;
+      } else if (data.status === 'error') {
+        clearInterval(timer);
+        progCard.classList.add('d-none');
+        showError('採点エラー: ' + data.message);
+      } else if (data.status === 'processing' && data.total > 0) {
+        progMsg.textContent = `採点中… ${data.done} / ${data.total} 名完了（現在：${data.current}）`;
+      }
+    } catch(_) { /* ネットワーク瞬断は無視して継続 */ }
+  }, 4000);
 }
 
 function setLoading(on) {
