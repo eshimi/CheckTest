@@ -385,6 +385,9 @@ def grade():
             "q_text_col": "問題文", "a_text_col": "解答", "unit_col": "ユニット",
         }
 
+        merged_mapping['q_comp_map']   = {}
+        merged_mapping['q_rubric_map'] = {}
+
         results_dir = RESULTS_DIR / session_id
         results_dir.mkdir(parents=True, exist_ok=True)
         progress_path = results_dir / "progress.json"

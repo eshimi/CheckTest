@@ -58,7 +58,7 @@ def build_prompt(question_text, rubrics_per_comp, answer, competencies,
     comp_blocks = []
     for c in competencies:
         r = rubrics_per_comp.get(c, '') if isinstance(rubrics_per_comp, dict) else rubrics_per_comp
-        comp_blocks.append(f"【{c}の採点基準】\n{r or '（採点基準なし）'}")
+        comp_blocks.append(f"【{c}の採点基準】\n{r or '（防災危機管理の専門知識と一般的な採点基準に基づいて評価してください）'}")
 
     comp_keys = ", ".join(f'"{c}": <0〜3の整数>' for c in competencies)
     comp_reason_keys = ", ".join(f'"{c}": "<採点理由（〜のためX点）>"' for c in competencies)
@@ -538,19 +538,21 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb
             ) else ""
             unit_val = str(row[unit_col]) if unit_col in row.index else ""
 
-            # メインスレッドで事前抽出されたコンピテンシーマップを優先使用
-            _q_comp_map = cm.get('q_comp_map', {})
+            # コンピテンシーと採点基準をマップから取得
+            _q_comp_map   = cm.get('q_comp_map', {})
+            _q_rubric_map = cm.get('q_rubric_map', {})
             if raw_q in _q_comp_map:
                 comps = _q_comp_map[raw_q]
             else:
                 comps = _extract_comps(raw_q)
-            _dlog(f"Q{idx:02d} comps={comps}")
+            rubrics = _q_rubric_map.get(raw_q, {})
+            _dlog(f"Q{idx:02d} comps={comps} has_rubrics={bool(rubrics)}")
             clean_q = _clean_q(raw_q)
             scene   = _scene(unit_val)
 
             result = grade_single(
                 question_text=clean_q,
-                rubrics_per_comp={},
+                rubrics_per_comp=rubrics,
                 answer=raw_ans,
                 competencies=comps,
             )
