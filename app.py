@@ -114,6 +114,18 @@ def allowed_file(filename):
     return Path(filename).suffix.lower() in ALLOWED_EXTENSIONS
 
 
+def _clean_columns(df):
+    """列名に含まれる Excel XML エスケープ（_x00XX_）や制御文字を除去して正規化する"""
+    import re
+    def clean(name):
+        s = str(name)
+        s = re.sub(r'_x[0-9a-fA-F]{4}_', '', s)   # _x0011_ 等を除去
+        s = re.sub(r'[\x00-\x1f\x7f]', '', s)       # 残った制御文字を除去
+        return s.strip()
+    df.columns = [clean(c) for c in df.columns]
+    return df
+
+
 def load_excel(filepath):
     fp = Path(filepath)
     if fp.suffix.lower() == ".csv":
@@ -129,11 +141,14 @@ def load_excel(filepath):
             seen.add(enc)
             try:
                 # sep=None + engine='python' で区切り文字を自動検出
-                return pd.read_csv(fp, encoding=enc, sep=None, engine="python")
+                df = pd.read_csv(fp, encoding=enc, sep=None, engine="python")
+                return _clean_columns(df)
             except (UnicodeDecodeError, ValueError):
                 continue
-        return pd.read_csv(fp, encoding="latin-1", sep=None, engine="python")
-    return pd.read_excel(fp)
+        df = pd.read_csv(fp, encoding="latin-1", sep=None, engine="python")
+        return _clean_columns(df)
+    df = pd.read_excel(fp)
+    return _clean_columns(df)
 
 
 def list_exams():
