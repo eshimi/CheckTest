@@ -385,8 +385,44 @@ def grade():
             "q_text_col": "問題文", "a_text_col": "解答", "unit_col": "ユニット",
         }
 
-        merged_mapping['q_comp_map']   = {}
-        merged_mapping['q_rubric_map'] = {}
+        # group_questions.json が存在する場合、問題文マッチングで comp/rubric マップを構築
+        import re as _re, unicodedata as _ud
+
+        def _nq(text):
+            """問題文を正規化して先頭50文字のマッチングキーを返す"""
+            s = _re.sub(r'※評価対象\s*コンピテンシー[：:].*', '', str(text)).strip()
+            s = _re.sub(r'&[a-zA-Z]+;', ' ', s)
+            s = _re.sub(r'\s+', ' ', s).strip()
+            return s[:50]
+
+        def _nfkc_keys(d):
+            """辞書キーをNFKC正規化（半角カタカナ→全角など）"""
+            return {_ud.normalize('NFKC', k): v for k, v in d.items()}
+
+        # 最新の group_questions.json を探す
+        gq_paths = sorted(EXAMS_DIR.glob("*/group_questions.json"),
+                          key=lambda p: p.stat().st_mtime, reverse=True)
+        q_comp_map, q_rubric_map = {}, {}
+        if gq_paths:
+            with open(gq_paths[0], encoding="utf-8") as _f:
+                _gq = json.load(_f)
+            _first_group = next(iter(_gq.values()))
+            _gq_index = {
+                _nq(q['text']): (q.get('active_comps', []), _nfkc_keys(q.get('rubrics', {})))
+                for q in _first_group
+            }
+            q_text_col = merged_mapping.get('q_text_col', '問題文')
+            if q_text_col in answers_df.columns:
+                for _raw_q in answers_df[q_text_col].dropna().unique():
+                    _prefix = _nq(str(_raw_q))
+                    if _prefix in _gq_index:
+                        _comps, _rubrics = _gq_index[_prefix]
+                        q_comp_map[str(_raw_q)]   = _comps
+                        q_rubric_map[str(_raw_q)] = _rubrics
+                print(f"[GRADE] q_comp_map built: {len(q_comp_map)}/{answers_df[q_text_col].dropna().nunique()} questions matched", flush=True)
+
+        merged_mapping['q_comp_map']   = q_comp_map
+        merged_mapping['q_rubric_map'] = q_rubric_map
 
         results_dir = RESULTS_DIR / session_id
         results_dir.mkdir(parents=True, exist_ok=True)
