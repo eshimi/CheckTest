@@ -8,7 +8,7 @@ from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, Response
 from werkzeug.utils import secure_filename
 import pandas as pd
-from grader import grade_exam, grade_exam_group_based
+from grader import grade_exam, grade_exam_group_based, grade_tall_format, is_tall_format
 from report_generator import generate_word_report
 from playwright.sync_api import sync_playwright as _sync_playwright
 import threading
@@ -270,6 +270,32 @@ def upload():
         answers_df = load_excel(a_path)
         a_columns = list(answers_df.columns)
 
+        # 縦型フォーマット（LMSエクスポート形式）の判定
+        if is_tall_format(answers_df):
+            examinees_count = answers_df["ログインID"].dropna().nunique() \
+                if "ログインID" in answers_df.columns else "?"
+            # 練習問題を除外した有効問題数
+            valid_df = answers_df[answers_df["問題文"].notna()]
+            if "ユニット" in valid_df.columns:
+                valid_df = valid_df[~valid_df["ユニット"].astype(str).str.contains("練習", na=True)]
+            q_per_person = len(valid_df) // max(examinees_count, 1) if isinstance(examinees_count, int) else "?"
+            return jsonify({
+                "session_id":       session_id,
+                "format":           "tall",
+                "examinees_count":  examinees_count,
+                "questions_count":  q_per_person,
+                "a_columns":        a_columns,
+                "column_mapping": {
+                    "a_id":      "ログインID",
+                    "a_name":    "名前",
+                    "a_dept":    "グループ",
+                    "a_genre":   "属性",
+                    "q_text_col":"問題文",
+                    "a_text_col":"解答",
+                    "unit_col":  "ユニット",
+                },
+            })
+
         if exam_id:
             # 事前登録モード
             meta_path = EXAMS_DIR / exam_id / "meta.json"
@@ -353,6 +379,13 @@ def grade():
     results_dir.mkdir(parents=True, exist_ok=True)
 
     try:
+        # 縦型フォーマット（LMSエクスポート）の場合は専用採点ルート
+        if is_tall_format(answers_df):
+            results = grade_tall_format(answers_df, merged_mapping, results_dir)
+            with open(results_dir / "summary.json", "w", encoding="utf-8") as f:
+                json.dump(results, f, ensure_ascii=False, indent=2)
+            return jsonify({"session_id": session_id, "results": results})
+
         # 班別モード（group_based）か通常モードかで分岐
         if ref_path.exists():
             group_q_path = EXAMS_DIR / exam_id / "group_questions.json"

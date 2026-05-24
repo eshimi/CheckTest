@@ -361,6 +361,164 @@ def grade_exam(questions_df, answers_df, column_mapping, results_dir):
     return all_results
 
 
+# ── 縦型フォーマット用ヘルパー ─────────────────────────────────────────────────
+
+import re as _re
+
+_COMP_NAME_MAP = {
+    'コミュニケーション力': 'コミュニケーション',
+    'コミュニケーション':   'コミュニケーション',
+    '情報収集力':           '情報収集',
+    '情報収集':             '情報収集',
+    '情報分析力':           '情報分析',
+    '情報分析':             '情報分析',
+    '想像・先読み力':       '想像・先読み',
+    '想像先読み力':         '想像・先読み',
+    '想像・先読み':         '想像・先読み',
+    '計画力':               '計画',
+    '計画':                 '計画',
+}
+_DEFAULT_COMPS = ['コミュニケーション', '情報収集', '情報分析', '想像・先読み', '計画']
+_ALL_COMPS     = ['コミュニケーション', '情報収集', '情報分析', '想像・先読み', '計画']
+
+
+def _extract_comps(q_text: str) -> list:
+    m = _re.search(r'※評価対象\s*コンピテンシー[：:]\s*(.+?)(?:\n|$)', q_text)
+    if not m:
+        return _DEFAULT_COMPS[:]
+    parts = _re.split(r'[、,，・]', m.group(1).strip())
+    result = []
+    for p in parts:
+        mapped = _COMP_NAME_MAP.get(p.strip())
+        if mapped and mapped not in result:
+            result.append(mapped)
+    return result if result else _DEFAULT_COMPS[:]
+
+
+def _clean_q(q_text: str) -> str:
+    q = _re.sub(r'※評価対象\s*コンピテンシー[：:].*', '', q_text).strip()
+    q = _re.sub(r'&[a-zA-Z]+;', ' ', q)
+    q = _re.sub(r'^最初に資料を読んで.*?(?=発災|以下|あなた|本社|班|現在|翌日|当日)',
+                '', q, flags=_re.DOTALL).strip()
+    return q
+
+
+def _scene(unit_text: str) -> str:
+    if not unit_text or unit_text in ('nan', 'NaN', 'None'):
+        return 'その他'
+    m = _re.search(r'シーン([1-3１-３一二三])', unit_text)
+    if m:
+        n = m.group(1).translate(str.maketrans('１２３一二三', '123123'))
+        return f'シーン{n}'
+    if '共通' in unit_text:
+        return 'シーン1'
+    return 'その他'
+
+
+def is_tall_format(df) -> bool:
+    """問題文と解答が同一ファイルにある縦型フォーマットかどうかを判定"""
+    cols = set(df.columns)
+    return ('問題文' in cols and '解答' in cols) or \
+           ('question_text' in cols and 'answer' in cols)
+
+
+def grade_tall_format(answers_df, column_mapping: dict, results_dir):
+    """
+    縦型フォーマット採点（1行 = 1問の回答、LMSエクスポート形式）
+    問題文・解答が同一ファイルに含まれるため、問題ファイル不要。
+    """
+    cm = column_mapping
+    a_id_col    = cm.get("a_id",     "ログインID")
+    a_name_col  = cm.get("a_name",   "名前")
+    a_dept_col  = cm.get("a_dept",   "グループ")
+    a_genre_col = cm.get("a_genre",  "属性")
+    q_text_col  = cm.get("q_text_col", "問題文")
+    a_text_col  = cm.get("a_text_col", "解答")
+    unit_col    = cm.get("unit_col",   "ユニット")
+
+    # 有効行に絞る：受験者IDと問題文が存在する行
+    df = answers_df.copy()
+    df = df[df[a_id_col].notna() & (df[a_id_col].astype(str).str.strip() != '')]
+    df = df[df[q_text_col].notna() & (df[q_text_col].astype(str).str.strip() != '')]
+    # 練習問題を除外
+    if unit_col in df.columns:
+        df = df[~df[unit_col].astype(str).str.contains('練習', na=True)]
+    df[a_id_col] = df[a_id_col].astype(str).str.strip()
+
+    all_results = []
+
+    for person_id, person_df in df.groupby(a_id_col, sort=False):
+        first        = person_df.iloc[0]
+        person_name  = str(first[a_name_col])  if a_name_col  in first.index else person_id
+        person_dept  = str(first[a_dept_col])  if a_dept_col  in first.index else ""
+        person_genre = str(first[a_genre_col]) if a_genre_col in first.index else ""
+
+        graded_answers = []
+        comp_totals    = {}
+        comp_max       = {}
+
+        for idx, (_, row) in enumerate(person_df.iterrows(), 1):
+            raw_q   = str(row[q_text_col])
+            raw_ans = str(row[a_text_col]) if (
+                a_text_col in row.index and
+                str(row[a_text_col]) not in ('nan', 'NaN', 'None', '')
+            ) else ""
+            unit_val = str(row[unit_col]) if unit_col in row.index else ""
+
+            comps   = _extract_comps(raw_q)
+            clean_q = _clean_q(raw_q)
+            scene   = _scene(unit_val)
+
+            result = grade_single(
+                question_text=clean_q,
+                rubrics_per_comp={},
+                answer=raw_ans,
+                competencies=comps,
+            )
+
+            for c in comps:
+                s = result["competency_scores"].get(c, 0)
+                comp_totals[c] = comp_totals.get(c, 0) + s
+                comp_max[c]    = comp_max.get(c, 0) + 2
+
+            result.update({
+                "question_id":    f"Q{idx:02d}",
+                "question_text":  clean_q,
+                "question_type":  "記述式",
+                "question_genre": scene,
+                "answer_text":    raw_ans,
+                "competencies":   comps,
+            })
+            graded_answers.append(result)
+
+        used_comps  = [c for c in _ALL_COMPS if c in comp_totals]
+        total_score = sum(comp_totals.values())
+        total_max   = sum(comp_max.values())
+        percentage  = round(total_score / total_max * 100, 1) if total_max > 0 else 0
+        comp_rates  = {
+            c: round(comp_totals[c] / comp_max[c] * 100, 1) if comp_max.get(c, 0) > 0 else 0
+            for c in used_comps
+        }
+
+        all_results.append({
+            "id":              person_id,
+            "name":            person_name,
+            "genre":           person_genre,
+            "department":      person_dept,
+            "total_score":     total_score,
+            "total_max":       total_max,
+            "percentage":      percentage,
+            "certification":   get_certification(percentage),
+            "comp_totals":     comp_totals,
+            "comp_max":        comp_max,
+            "comp_rates":      comp_rates,
+            "competency_cols": used_comps,
+            "answers":         graded_answers,
+        })
+
+    return all_results
+
+
 def get_certification(percentage):
     if percentage >= 90:
         return {"level": "上級認定", "label": "S", "color": "#1a6e3c"}

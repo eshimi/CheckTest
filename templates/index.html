@@ -612,6 +612,20 @@ async function doUpload() {
 
 function showMapping(data) {
   const info = document.getElementById('previewInfo');
+  const mf   = document.getElementById('mappingForm');
+
+  // 縦型フォーマット（LMSエクスポート）の場合は確認のみ表示
+  if (data.format === 'tall') {
+    info.innerHTML = `<i class="bi bi-check-circle-fill" style="color:#1a6e3c"></i> `
+      + `受験者 <strong>${data.examinees_count}</strong>名 × 約 <strong>${data.questions_count}</strong>問を検出しました。`
+      + `<br><small style="color:#475569">LMSエクスポート形式を自動認識しました。列マッピング不要です。</small>`;
+    info.classList.remove('d-none');
+    mf.innerHTML = '';
+    document.getElementById('mappingSection').classList.remove('d-none');
+    document.getElementById('mappingSection').scrollIntoView({behavior:'smooth'});
+    return;
+  }
+
   const examLabel = data.exam_name ? `「${data.exam_name}」` : '';
   info.innerHTML = `<i class="bi bi-check-circle-fill" style="color:#1a6e3c"></i> 試験${examLabel}：問題数 <strong>${data.questions_count}</strong>件、受験者数 <strong>${data.examinees_count}</strong>名を読み込みました。`;
   info.classList.remove('d-none');
