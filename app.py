@@ -417,7 +417,8 @@ def grade():
                     _prefix = _nq(str(_raw_q))
                     if _prefix in _gq_index:
                         _comps, _rubrics = _gq_index[_prefix]
-                        q_comp_map[str(_raw_q)]   = _comps
+                        # active_comps の半角カタカナを全角に正規化
+                        q_comp_map[str(_raw_q)]   = [_ud.normalize('NFKC', c) for c in _comps]
                         q_rubric_map[str(_raw_q)] = _rubrics
                 print(f"[GRADE] q_comp_map built: {len(q_comp_map)}/{answers_df[q_text_col].dropna().nunique()} questions matched", flush=True)
 
