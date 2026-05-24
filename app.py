@@ -352,6 +352,26 @@ def grade():
     if not a_files:
         return jsonify({"error": "回答ファイルが見つかりません"}), 404
 
+    answers_df = load_excel(a_files[0])
+
+    # 縦型フォーマット（LMSエクスポート）は問題ファイル不要 — 先に判定する
+    if is_tall_format(answers_df):
+        merged_mapping = column_mapping or {
+            "a_id": "ログインID", "a_name": "名前",
+            "a_dept": "グループ", "a_genre": "属性",
+            "q_text_col": "問題文", "a_text_col": "解答", "unit_col": "ユニット",
+        }
+        results_dir = RESULTS_DIR / session_id
+        results_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            results = grade_tall_format(answers_df, merged_mapping, results_dir)
+            with open(results_dir / "summary.json", "w", encoding="utf-8") as f:
+                json.dump(results, f, ensure_ascii=False, indent=2)
+            return jsonify({"session_id": session_id, "results": results})
+        except Exception as e:
+            import traceback
+            return jsonify({"error": f"採点処理中にエラーが発生しました: {str(e)}", "detail": traceback.format_exc()}), 500
+
     # 問題ファイルの解決: セッション内 or 事前登録
     ref_path = session_dir / "exam_ref.json"
     if ref_path.exists():
@@ -361,7 +381,6 @@ def grade():
         q_files = list((EXAMS_DIR / exam_id).glob("questions.*"))
         if not q_files:
             return jsonify({"error": "試験設定の問題ファイルが見つかりません"}), 404
-        # 登録済みマッピングをベースに、リクエスト側の値で上書き
         meta_path = EXAMS_DIR / exam_id / "meta.json"
         with open(meta_path, encoding="utf-8") as f:
             meta = json.load(f)
@@ -373,19 +392,11 @@ def grade():
         merged_mapping = column_mapping
 
     questions_df = load_excel(q_files[0])
-    answers_df = load_excel(a_files[0])
 
     results_dir = RESULTS_DIR / session_id
     results_dir.mkdir(parents=True, exist_ok=True)
 
     try:
-        # 縦型フォーマット（LMSエクスポート）の場合は専用採点ルート
-        if is_tall_format(answers_df):
-            results = grade_tall_format(answers_df, merged_mapping, results_dir)
-            with open(results_dir / "summary.json", "w", encoding="utf-8") as f:
-                json.dump(results, f, ensure_ascii=False, indent=2)
-            return jsonify({"session_id": session_id, "results": results})
-
         # 班別モード（group_based）か通常モードかで分岐
         if ref_path.exists():
             group_q_path = EXAMS_DIR / exam_id / "group_questions.json"
