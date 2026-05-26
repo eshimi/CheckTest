@@ -296,7 +296,8 @@ def upload():
             examinees_count = answers_df["ログインID"].dropna().nunique() \
                 if "ログインID" in answers_df.columns else "?"
             # 練習問題を除外した有効問題数
-            valid_df = answers_df[answers_df["問題文"].notna()]
+            q_col = "問題文" if "問題文" in answers_df.columns else answers_df.columns[0]
+            valid_df = answers_df[answers_df[q_col].notna()]
             if "ユニット" in valid_df.columns:
                 valid_df = valid_df[~valid_df["ユニット"].astype(str).str.contains("練習", na=True)]
             q_per_person = len(valid_df) // max(examinees_count, 1) if isinstance(examinees_count, int) else "?"
@@ -385,19 +386,14 @@ def grade():
             "q_text_col": "問題文", "a_text_col": "解答", "unit_col": "ユニット",
         }
 
-        # group_questions.json が存在する場合、問題文マッチングで comp/rubric マップを構築
+        # group_questions.json が存在する場合、ユニット+出題順でcomp/rubricマップを構築
         import re as _re, unicodedata as _ud
 
-        def _nq(text):
-            """問題文を正規化して先頭50文字のマッチングキーを返す"""
-            s = _re.sub(r'※評価対象\s*コンピテンシー[：:].*', '', str(text)).strip()
-            s = _re.sub(r'&[a-zA-Z]+;', ' ', s)
-            s = _re.sub(r'\s+', ' ', s).strip()
-            return s[:50]
+        def _nfkc(s):
+            return _ud.normalize('NFKC', s)
 
         def _nfkc_keys(d):
-            """辞書キーをNFKC正規化（半角カタカナ→全角など）"""
-            return {_ud.normalize('NFKC', k): v for k, v in d.items()}
+            return {_nfkc(k): v for k, v in d.items()}
 
         # 最新の group_questions.json を探す
         gq_paths = sorted(EXAMS_DIR.glob("*/group_questions.json"),
@@ -406,23 +402,50 @@ def grade():
         if gq_paths:
             with open(gq_paths[0], encoding="utf-8") as _f:
                 _gq = json.load(_f)
-            # 全グループからインデックスを構築（個別問題はグループごとに問題文が異なるため）
-            _gq_index = {}
-            for _group_qs in _gq.values():
-                for q in _group_qs:
-                    _prefix = _nq(q['text'])
-                    _gq_index[_prefix] = (
-                        [_ud.normalize('NFKC', c) for c in q.get('active_comps', [])],
-                        _nfkc_keys(q.get('rubrics', {}))
+
+            # インデックス: (group_key, scene, no文字列) → (comps, rubrics)
+            _pos_index = {}
+            for _grp_key, _qs in _gq.items():
+                for _q in _qs:
+                    _pk = (_grp_key, _q['scene'], str(_q['no']))
+                    _pos_index[_pk] = (
+                        [_nfkc(c) for c in _q.get('active_comps', [])],
+                        _nfkc_keys(_q.get('rubrics', {}))
                     )
+
+            def _grp_from_unit(unit_str):
+                """ユニット文字列 → JSONグループキー（例: '10情報統括'）"""
+                for _k in _gq.keys():
+                    if _k in unit_str:
+                        return _k
+                return None
+
+            def _scene_from_unit(unit_str):
+                m = _re.search(r'シーン([1-3])', unit_str)
+                return f'シーン{m.group(1)}' if m else None
+
             q_text_col = merged_mapping.get('q_text_col', '問題文')
-            if q_text_col in answers_df.columns:
-                for _raw_q in answers_df[q_text_col].dropna().unique():
-                    _prefix = _nq(str(_raw_q))
-                    if _prefix in _gq_index:
-                        _comps, _rubrics = _gq_index[_prefix]
-                        q_comp_map[str(_raw_q)]   = _comps
-                        q_rubric_map[str(_raw_q)] = _rubrics
+            unit_col_k = merged_mapping.get('unit_col', 'ユニット')
+
+            if q_text_col in answers_df.columns and unit_col_k in answers_df.columns:
+                _seen = set()
+                for _, _row in answers_df.dropna(subset=[q_text_col]).iterrows():
+                    _raw_q = str(_row[q_text_col])
+                    if _raw_q in _seen:
+                        continue
+                    _unit = str(_row.get(unit_col_k, ''))
+                    _no   = str(int(_row['出題順'])) if '出題順' in _row.index else ''
+                    _grp  = _grp_from_unit(_unit)
+                    _scn  = _scene_from_unit(_unit)
+                    # シーン1共通テストはグループキーが取れないので最初のグループを使用
+                    if _grp is None and _scn == 'シーン1':
+                        _grp = list(_gq.keys())[0]
+                    if _grp and _scn and _no:
+                        _pk = (_grp, _scn, _no)
+                        if _pk in _pos_index:
+                            q_comp_map[_raw_q]   = _pos_index[_pk][0]
+                            q_rubric_map[_raw_q] = _pos_index[_pk][1]
+                            _seen.add(_raw_q)
                 print(f"[GRADE] q_comp_map built: {len(q_comp_map)}/{answers_df[q_text_col].dropna().nunique()} questions matched", flush=True)
 
         merged_mapping['q_comp_map']   = q_comp_map
