@@ -204,7 +204,7 @@ def load_context(results_dir) -> dict:
         return json.load(f)
 
 
-def grade_exam_group_based(group_questions: dict, answers_df, column_mapping: dict, results_dir):
+def grade_exam_group_based(group_questions: dict, answers_df, column_mapping: dict, results_dir, progress_cb=None):
     """
     group_questions: {班名: [{seq, label, text, active_comps, rubrics, ...}]}
     answers_df: 受験者回答DataFrame（Q01〜Q22列 + 受験者ID/氏名/班名/所属）
@@ -221,13 +221,30 @@ def grade_exam_group_based(group_questions: dict, answers_df, column_mapping: di
     a_dept_col  = cm.get("a_dept",  answers_df.columns[3] if len(answers_df.columns) > 3 else None)
     comp_cols   = cm.get("competency_cols", ['ｺﾐｭﾆｹｰｼｮﾝ', '情報収集', '情報分析', '想像・先読み', '計画'])
 
-    all_results = []
+    # 個別保存ディレクトリ（クラッシュ対策・再開用）
+    individual_dir = Path(results_dir) / "individual"
+    individual_dir.mkdir(parents=True, exist_ok=True)
 
-    for _, a_row in answers_df.iterrows():
+    all_results = []
+    rows_list = list(answers_df.iterrows())
+    total_persons = len(rows_list)
+
+    for person_idx, (_, a_row) in enumerate(rows_list, 1):
         examinee_id    = str(a_row[a_id_col])
         examinee_name  = str(a_row[a_name_col])
         examinee_genre = str(a_row[a_genre_col]).strip() if a_genre_col and a_genre_col in a_row.index else ""
         examinee_dept  = str(a_row[a_dept_col]).strip() if a_dept_col and a_dept_col in a_row.index else ""
+
+        # 採点済みチェック（再開時はスキップ）
+        safe_id = examinee_id.replace('/', '_').replace('\\', '_').replace(':', '_')
+        individual_path = individual_dir / f"{safe_id}.json"
+        if individual_path.exists():
+            with open(individual_path, encoding='utf-8') as _f:
+                cached = json.load(_f)
+            all_results.append(cached)
+            if progress_cb:
+                progress_cb(person_idx, total_persons, examinee_name + "（採点済・スキップ）")
+            continue
 
         # この人の班の問題セットを取得
         questions = group_questions.get(examinee_genre)
@@ -284,7 +301,7 @@ def grade_exam_group_based(group_questions: dict, answers_df, column_mapping: di
             for c in comp_cols
         }
 
-        all_results.append({
+        person_result = {
             "id":              examinee_id,
             "name":            examinee_name,
             "genre":           examinee_genre,
@@ -298,7 +315,15 @@ def grade_exam_group_based(group_questions: dict, answers_df, column_mapping: di
             "comp_rates":      comp_rates,
             "competency_cols": comp_cols,
             "answers":         graded_answers,
-        })
+        }
+        # 1人完了ごとに個別ファイルへ即時保存
+        with open(individual_path, 'w', encoding='utf-8') as _f:
+            json.dump(person_result, _f, ensure_ascii=False, indent=2)
+
+        all_results.append(person_result)
+
+        if progress_cb:
+            progress_cb(person_idx, total_persons, examinee_name)
 
     return all_results
 
@@ -533,6 +558,10 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb
         df = df[~df[unit_col].astype(str).str.contains('練習', na=True)]
     df[a_id_col] = df[a_id_col].astype(str).str.strip()
 
+    # 個別保存ディレクトリ（クラッシュ対策・再開用）
+    individual_dir = Path(results_dir) / "individual"
+    individual_dir.mkdir(parents=True, exist_ok=True)
+
     all_results = []
     grouped = list(df.groupby(a_id_col, sort=False))
     total_persons = len(grouped)
@@ -542,6 +571,18 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb
         person_name  = str(first[a_name_col])  if a_name_col  in first.index else person_id
         person_dept  = str(first[a_dept_col])  if a_dept_col  in first.index else ""
         person_genre = str(first[a_genre_col]) if a_genre_col in first.index else ""
+
+        # 採点済みチェック（再開時はスキップ）
+        safe_id = str(person_id).replace('/', '_').replace('\\', '_').replace(':', '_')
+        individual_path = individual_dir / f"{safe_id}.json"
+        if individual_path.exists():
+            with open(individual_path, encoding='utf-8') as _f:
+                cached = json.load(_f)
+            all_results.append(cached)
+            _dlog(f"SKIP (already graded): {person_name}")
+            if progress_cb:
+                progress_cb(person_idx, total_persons, person_name + "（採点済・スキップ）")
+            continue
 
         graded_answers = []
         comp_totals    = {}
@@ -598,7 +639,7 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb
             for c in used_comps
         }
 
-        all_results.append({
+        person_result = {
             "id":              person_id,
             "name":            person_name,
             "genre":           person_genre,
@@ -612,7 +653,13 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb
             "comp_rates":      comp_rates,
             "competency_cols": used_comps,
             "answers":         graded_answers,
-        })
+        }
+        # 1人完了ごとに個別ファイルへ即時保存
+        with open(individual_path, 'w', encoding='utf-8') as _f:
+            json.dump(person_result, _f, ensure_ascii=False, indent=2)
+        _dlog(f"SAVED individual: {person_name} -> {individual_path.name}")
+
+        all_results.append(person_result)
 
         if progress_cb:
             progress_cb(person_idx, total_persons, person_name)

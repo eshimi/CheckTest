@@ -107,9 +107,13 @@ def strip_comp_note(text):
     return text
 
 BASE_DIR = Path(__file__).parent
-UPLOAD_DIR = BASE_DIR / "uploads"
-RESULTS_DIR = BASE_DIR / "results"
-EXAMS_DIR = BASE_DIR / "exams"
+# Render Disk が /data にマウントされている場合はそちらを使用（永続化）
+# ローカル環境では従来通り BASE_DIR 以下を使用
+_DISK_ROOT = Path("/data")
+_USE_DISK  = _DISK_ROOT.exists() and _DISK_ROOT.is_dir()
+UPLOAD_DIR  = (_DISK_ROOT / "uploads")  if _USE_DISK else (BASE_DIR / "uploads")
+RESULTS_DIR = (_DISK_ROOT / "results")  if _USE_DISK else (BASE_DIR / "results")
+EXAMS_DIR   = BASE_DIR / "exams"  # 試験定義はコードと一緒に管理
 ALLOWED_EXTENSIONS = {".xlsx", ".xls", ".csv"}
 
 for d in [UPLOAD_DIR, RESULTS_DIR, EXAMS_DIR]:
