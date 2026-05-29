@@ -101,7 +101,7 @@ ca.border    = border
 
 for col, comp in enumerate(COMPS, 3):
     total = sum(ans['competency_scores'].get(comp, 0) for ans in answers if comp in ans['competencies'])
-    max_v = sum(3 for ans in answers if comp in ans['competencies'])
+    max_v = sum(2 for ans in answers if comp in ans['competencies'])
     cell       = ws.cell(row=total_row, column=col, value=f'{total}/{max_v}')
     cell.font  = Font(name='Arial', bold=True, color='FFFFFF')
     cell.fill  = header_fill
