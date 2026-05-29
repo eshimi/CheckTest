@@ -757,15 +757,17 @@ function pollProgress(sid) {
         progBarWrap.style.display = 'block';
         progBar.style.width = pct + '%';
 
-        // ETA計算（2名以上完了してから表示）
-        if (done >= 2 && data.started_at && data.now) {
-          const elapsed    = data.now - data.started_at;        // 経過秒
-          const avgPerPerson = elapsed / done;                   // 1人あたり平均秒
-          const remaining  = (total - done) * avgPerPerson;     // 残り推定秒
-          const eta = fmtSeconds(remaining);
-          progEta.textContent = `残り${total - done}名 ／ 推定残り時間：${eta}（1人あたり平均 ${fmtSeconds(avgPerPerson)}）`;
-        } else if (done === 1) {
-          progEta.textContent = `残り${total - done}名 ／ 残り時間を計算中…`;
+        // ETA計算
+        if (data.started_at && data.now) {
+          const elapsed = data.now - data.started_at;
+          if (done >= 1 && elapsed > 5) {
+            const avgPerPerson = elapsed / done;
+            const remaining    = (total - done) * avgPerPerson;
+            const eta = fmtSeconds(remaining);
+            progEta.textContent = `残り${total - done}名 ／ 推定残り時間：${eta}（1人あたり平均 ${fmtSeconds(avgPerPerson)}）`;
+          } else {
+            progEta.textContent = `${total}名を採点します。最初の1名完了後に残り時間を表示します。`;
+          }
         } else {
           progEta.textContent = `${total}名を採点します。しばらくお待ちください。`;
         }

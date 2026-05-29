@@ -460,8 +460,10 @@ def grade():
         progress_path = results_dir / "progress.json"
         import time as _time
         _started_at = _time.time()
+        _total_est_tf = answers_df[answers_df.columns[0]].dropna().nunique()
         with open(progress_path, "w", encoding="utf-8") as f:
-            json.dump({"status": "processing", "done": 0, "total": 0, "current": "", "started_at": _started_at}, f)
+            json.dump({"status": "processing", "done": 0, "total": _total_est_tf, "current": "採点準備中…",
+                       "started_at": _started_at, "now": _started_at}, f)
 
         def _bg_grade(df, mapping, rdir, sid, ppath, started_at=_started_at):
             try:
@@ -518,9 +520,11 @@ def grade():
 
     import time as _time
     _started_at2 = _time.time()
+    _total_est = len(answers_df)  # 人数を事前にカウント
     progress_path2 = results_dir / "progress.json"
     with open(progress_path2, "w", encoding="utf-8") as f:
-        json.dump({"status": "processing", "done": 0, "total": 0, "current": "", "started_at": _started_at2}, f)
+        json.dump({"status": "processing", "done": 0, "total": _total_est, "current": "採点準備中…",
+                   "started_at": _started_at2, "now": _started_at2}, f)
 
     # 班別モード（group_based）か通常モードかで分岐
     if ref_path.exists():
