@@ -525,7 +525,13 @@
     <div class="card progress-card d-none" id="progressSection" style="margin-top:24px">
       <div class="spinner"></div>
       <h5>AI採点を実行中です…</h5>
-      <p>受験者全員の採点が完了するまでしばらくお待ちください。<br>この画面はそのままにしておいてください。</p>
+      <p id="progMsg">受験者全員の採点が完了するまでしばらくお待ちください。<br>この画面はそのままにしておいてください。</p>
+      <div id="progBarWrap" style="display:none;margin-top:12px">
+        <div style="background:#e2e8f0;border-radius:8px;height:12px;overflow:hidden">
+          <div id="progBar" style="height:12px;border-radius:8px;background:var(--primary);transition:width .5s ease;width:0%"></div>
+        </div>
+        <div id="progEta" style="font-size:12px;color:#64748b;margin-top:6px;text-align:center"></div>
+      </div>
     </div>
 
     <!-- エラー -->
@@ -708,7 +714,22 @@ async function doGrade() {
 
 function pollProgress(sid) {
   const progCard = document.getElementById('progressSection');
-  const progMsg  = progCard.querySelector('p');
+  const progMsg     = document.getElementById('progMsg');
+  const progBarWrap = document.getElementById('progBarWrap');
+  const progBar     = document.getElementById('progBar');
+  const progEta     = document.getElementById('progEta');
+
+  function fmtSeconds(sec) {
+    sec = Math.round(sec);
+    if (sec < 60)  return `約${sec}秒`;
+    if (sec < 3600) {
+      const m = Math.floor(sec / 60), s = sec % 60;
+      return s > 0 ? `約${m}分${s}秒` : `約${m}分`;
+    }
+    const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60);
+    return m > 0 ? `約${h}時間${m}分` : `約${h}時間`;
+  }
+
   const timer = setInterval(async () => {
     try {
       const res  = await fetch(`/grade/progress/${sid}`);
@@ -721,7 +742,33 @@ function pollProgress(sid) {
         progCard.classList.add('d-none');
         showError('採点エラー: ' + data.message);
       } else if (data.status === 'processing' && data.total > 0) {
-        progMsg.textContent = `採点中… ${data.done} / ${data.total} 名完了（現在：${data.current}）`;
+        const done  = data.done;
+        const total = data.total;
+        const pct   = Math.round(done / total * 100);
+        const name  = data.current || '';
+
+        // スキップ済みを除いた現在採点中かどうか
+        const isSkipped = name.includes('採点済・スキップ');
+        progMsg.textContent = isSkipped
+          ? `採点中… ${done} / ${total} 名完了（${name}）`
+          : `採点中… ${done} / ${total} 名完了${name ? '（現在：' + name + '）' : ''}`;
+
+        // プログレスバー
+        progBarWrap.style.display = 'block';
+        progBar.style.width = pct + '%';
+
+        // ETA計算（2名以上完了してから表示）
+        if (done >= 2 && data.started_at && data.now) {
+          const elapsed    = data.now - data.started_at;        // 経過秒
+          const avgPerPerson = elapsed / done;                   // 1人あたり平均秒
+          const remaining  = (total - done) * avgPerPerson;     // 残り推定秒
+          const eta = fmtSeconds(remaining);
+          progEta.textContent = `残り${total - done}名 ／ 推定残り時間：${eta}（1人あたり平均 ${fmtSeconds(avgPerPerson)}）`;
+        } else if (done === 1) {
+          progEta.textContent = `残り${total - done}名 ／ 残り時間を計算中…`;
+        } else {
+          progEta.textContent = `${total}名を採点します。しばらくお待ちください。`;
+        }
       }
     } catch(_) { /* ネットワーク瞬断は無視して継続 */ }
   }, 4000);

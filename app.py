@@ -458,17 +458,20 @@ def grade():
         results_dir = RESULTS_DIR / session_id
         results_dir.mkdir(parents=True, exist_ok=True)
         progress_path = results_dir / "progress.json"
+        import time as _time
+        _started_at = _time.time()
         with open(progress_path, "w", encoding="utf-8") as f:
-            json.dump({"status": "processing", "done": 0, "total": 0, "current": ""}, f)
+            json.dump({"status": "processing", "done": 0, "total": 0, "current": "", "started_at": _started_at}, f)
 
-        def _bg_grade(df, mapping, rdir, sid, ppath):
+        def _bg_grade(df, mapping, rdir, sid, ppath, started_at=_started_at):
             try:
                 import importlib, grader as _gmod
                 importlib.reload(_gmod)
                 _grade_fn = _gmod.grade_tall_format
                 def cb(done, total, name):
+                    import time as _t
                     with open(ppath, "w", encoding="utf-8") as fp:
-                        json.dump({"status": "processing", "done": done, "total": total, "current": name}, fp, ensure_ascii=False)
+                        json.dump({"status": "processing", "done": done, "total": total, "current": name, "started_at": started_at, "now": _t.time()}, fp, ensure_ascii=False)
                 results = _grade_fn(df, mapping, rdir, progress_cb=cb)
                 with open(rdir / "summary.json", "w", encoding="utf-8") as fp:
                     json.dump(results, fp, ensure_ascii=False, indent=2)
@@ -513,26 +516,45 @@ def grade():
     results_dir = RESULTS_DIR / session_id
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    try:
-        # 班別モード（group_based）か通常モードかで分岐
-        if ref_path.exists():
-            group_q_path = EXAMS_DIR / exam_id / "group_questions.json"
-        else:
-            group_q_path = None
+    import time as _time
+    _started_at2 = _time.time()
+    progress_path2 = results_dir / "progress.json"
+    with open(progress_path2, "w", encoding="utf-8") as f:
+        json.dump({"status": "processing", "done": 0, "total": 0, "current": "", "started_at": _started_at2}, f)
 
-        if group_q_path and group_q_path.exists():
-            with open(group_q_path, encoding="utf-8") as f:
-                group_questions = json.load(f)
-            results = grade_exam_group_based(group_questions, answers_df, merged_mapping, results_dir)
-        else:
-            results = grade_exam(questions_df, answers_df, merged_mapping, results_dir)
+    # 班別モード（group_based）か通常モードかで分岐
+    if ref_path.exists():
+        group_q_path = EXAMS_DIR / exam_id / "group_questions.json"
+    else:
+        group_q_path = None
 
-        with open(results_dir / "summary.json", "w", encoding="utf-8") as f:
-            json.dump(results, f, ensure_ascii=False, indent=2)
-        return jsonify({"session_id": session_id, "results": results})
-    except Exception as e:
-        import traceback
-        return jsonify({"error": f"採点処理中にエラーが発生しました: {str(e)}", "detail": traceback.format_exc()}), 500
+    def _bg_grade2(gq_path, a_df, mapping, rdir, sid, ppath, started_at=_started_at2):
+        try:
+            import importlib, grader as _gmod
+            importlib.reload(_gmod)
+            def cb(done, total, name):
+                import time as _t
+                with open(ppath, "w", encoding="utf-8") as fp:
+                    json.dump({"status": "processing", "done": done, "total": total, "current": name,
+                               "started_at": started_at, "now": _t.time()}, fp, ensure_ascii=False)
+            if gq_path and Path(gq_path).exists():
+                with open(gq_path, encoding="utf-8") as f:
+                    gq = json.load(f)
+                results = _gmod.grade_exam_group_based(gq, a_df, mapping, rdir, progress_cb=cb)
+            else:
+                results = _gmod.grade_exam(questions_df, a_df, mapping, rdir)
+            with open(rdir / "summary.json", "w", encoding="utf-8") as fp:
+                json.dump(results, fp, ensure_ascii=False, indent=2)
+            with open(ppath, "w", encoding="utf-8") as fp:
+                json.dump({"status": "done", "session_id": sid}, fp)
+        except Exception as e:
+            import traceback
+            with open(ppath, "w", encoding="utf-8") as fp:
+                json.dump({"status": "error", "message": str(e), "detail": traceback.format_exc()}, fp, ensure_ascii=False)
+
+    t2 = threading.Thread(target=_bg_grade2, args=(group_q_path, answers_df, merged_mapping, results_dir, session_id, progress_path2), daemon=True)
+    t2.start()
+    return jsonify({"session_id": session_id, "status": "processing"})
 
 
 # ── レポート ──────────────────────────────────────────────────────────────────
