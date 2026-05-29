@@ -976,6 +976,16 @@ def grade_progress(session_id):
         return jsonify(json.load(f))
 
 
+@app.route("/grade/debug_log/<session_id>")
+def grade_debug_log(session_id):
+    log_path = RESULTS_DIR / session_id / "grade_debug.log"
+    if not log_path.exists():
+        return "<pre>ログファイルが見つかりません</pre>", 404
+    with open(log_path, encoding="utf-8") as f:
+        content = f.read()
+    return f"<pre style='font-family:monospace;font-size:13px;white-space:pre-wrap'>{content}</pre>"
+
+
 @app.route("/guide")
 def guide():
     return render_template("guide.html")
