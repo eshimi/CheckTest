@@ -230,7 +230,7 @@ def review_scene(scene_name: str, graded_scene_questions: list) -> dict:
     prompt = build_review_prompt(scene_name, graded_scene_questions)
     response = client.messages.create(
         model="claude-sonnet-4-6",
-        max_tokens=1024,
+        max_tokens=4096,
         temperature=0,
         system=[{"type": "text", "text": REVIEW_SYSTEM_PROMPT, "cache_control": {"type": "ephemeral"}}],
         messages=[{"role": "user", "content": prompt}]
@@ -362,6 +362,15 @@ def grade_exam_group_based(group_questions: dict, answers_df, column_mapping: di
     group_questions: {班名: [{seq, label, text, active_comps, rubrics, ...}]}
     answers_df: 受験者回答DataFrame（Q01〜Q22列 + 受験者ID/氏名/班名/所属）
     """
+    import datetime as _dt
+    _log_path = Path(results_dir) / "grade_debug.log"
+    def _dlog(msg):
+        try:
+            with open(str(_log_path), 'a', encoding='utf-8') as _f:
+                _f.write(f"[{_dt.datetime.now().strftime('%H:%M:%S')}] {msg}\n")
+        except Exception:
+            pass
+
     # コンテキスト読み込み
     ctx = load_context(results_dir)
     prerequisite = ctx.get("prerequisite", "")
@@ -447,7 +456,9 @@ def grade_exam_group_based(group_questions: dict, answers_df, column_mapping: di
 
         # ── パス2：シーン内クロス評価（別問題の回答で格上げ） ─────────────
         for scene_name, scene_qs in scene_buckets.items():
+            _dlog(f"PASS2 START: {scene_name} ({len(scene_qs)}問)")
             upgrades = review_scene(scene_name, scene_qs)
+            _dlog(f"PASS2 RESULT: {scene_name} → 格上げ{len(upgrades)}件: {list(upgrades.keys())}")
             for (q_id, comp), upg in upgrades.items():
                 for ga in graded_answers:
                     if ga["question_id"] == q_id and comp in ga.get("competency_scores", {}):
@@ -460,6 +471,7 @@ def grade_exam_group_based(group_questions: dict, answers_df, column_mapping: di
                             ga.setdefault("competency_reasons", {})[comp] = (
                                 old_reason + f"　※シーン内別問題の回答を考慮して{old_s}点→{new_s}点に格上げ（{upg['reason']}）"
                             )
+                            _dlog(f"  UPGRADE: {q_id} {comp} {old_s}→{new_s}")
 
         # _rubrics はAPIレスポンス用途外なので削除
         for ga in graded_answers:
@@ -610,7 +622,7 @@ def grade_exam(questions_df, answers_df, column_mapping, results_dir):
 
 import re as _re
 
-print("=== GRADER VERSION 2026-05-24-B LOADED ===", flush=True)
+print("=== GRADER VERSION 2026-05-29-A LOADED ===", flush=True)
 
 _COMP_NAME_MAP = {
     'コミュニケーション力': 'コミュニケーション',
