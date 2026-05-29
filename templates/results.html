@@ -79,7 +79,7 @@
 {% if genres | length > 1 %}
 <div class="mb-3">
   <div class="d-flex flex-wrap gap-2 align-items-center">
-    <span class="text-muted small fw-bold me-1">ジャンル：</span>
+    <span class="text-muted small fw-bold me-1">班：</span>
     <button class="btn btn-sm btn-primary genre-filter active" data-genre="all">すべて ({{ results|length }})</button>
     {% for g in genres %}
     <button class="btn btn-sm btn-outline-primary genre-filter" data-genre="{{ g }}">
@@ -97,8 +97,8 @@
       <thead style="background:var(--primary);color:#fff;">
         <tr>
           <th class="ps-3">氏名</th>
-          <th>ジャンル</th>
-          <th>グループID</th>
+          <th>班</th>
+          <th>部門</th>
           <th class="text-center">得点</th>
           <th class="text-center" style="min-width:140px">得点率</th>
           {% if competency_cols %}
@@ -149,7 +149,7 @@
 
 <!-- ジャンル別サマリー -->
 {% if genre_summaries %}
-<h5 class="fw-bold mt-4 mb-3" style="color:var(--primary)"><i class="bi bi-diagram-3 me-2"></i>ジャンル別サマリー</h5>
+<h5 class="fw-bold mt-4 mb-3" style="color:var(--primary)"><i class="bi bi-diagram-3 me-2"></i>班別サマリー</h5>
 <div class="row g-3">
   {% for g, gs in genre_summaries.items() %}
   <div class="col-md-6 col-lg-4">

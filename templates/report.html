@@ -254,17 +254,14 @@
     <div class="rpt-title-area">
       <h1><i class="bi bi-shield-check me-2"></i>認定プログラムフィードバックシート</h1>
       <p style="font-size:22px;font-weight:normal;margin-bottom:4px">
-        {{ examinee.id | mask_id }} 様　｜　グループID: {{ examinee.department }}　｜　ジャンル: {{ examinee.genre or '未設定' }}
+        {{ examinee.id | mask_id }} 様　｜　部門: {{ examinee.department }}　｜　班: {{ examinee.genre or '未設定' }}
       </p>
       <p>ご受講いただいた「中上級者認定テスト」の採点結果フィードバックです。</p>
     </div>
     <div class="rpt-header-right">
       <img src="/static/images/docomo_business.png" alt="NTT docomo Business" class="rpt-logo">
       <div class="rpt-pct-block">
-        <span class="rpt-pct">{{ examinee.percentage }}%</span>
-        <div class="rpt-pct-sub">
-          総合得点率　{{ examinee.total_score }} / {{ examinee.total_max }}点
-        </div>
+        <span class="rpt-pct" style="font-size:28px">総合得点率{{ examinee.percentage }}%</span>
       </div>
     </div>
   </div>
@@ -371,20 +368,20 @@
 </div>
 {% endif %}
 
-{# ── ジャンル内比較 ── #}
+{# ── 班内比較 ── #}
 {% if genre_stats %}
 <div class="card mb-4">
   <div class="card-header fw-bold py-2" style="background:#e8eef5;color:var(--primary)">
-    <i class="bi bi-people me-2"></i>ジャンル内比較（{{ examinee.genre }}）
+    <i class="bi bi-people me-2"></i>班内比較（{{ examinee.genre }}）
   </div>
   <div class="card-body">
     <div class="row g-3">
       <div class="col-md-4 text-center">
-        <div class="text-muted small">ジャンル内順位</div>
+        <div class="text-muted small">班内順位</div>
         <div class="fs-3 fw-bold" style="color:var(--primary)">{{ genre_stats.rank }} <span class="fs-6 text-muted">/ {{ genre_stats.total }}名</span></div>
       </div>
       <div class="col-md-4 text-center border-start border-end">
-        <div class="text-muted small">ジャンル平均</div>
+        <div class="text-muted small">班平均</div>
         <div class="fs-3 fw-bold">{{ genre_stats.avg }}%</div>
       </div>
       <div class="col-md-4 text-center">
@@ -402,7 +399,6 @@
 {# ── 問題別採点結果 ── #}
 <h5 class="fw-bold mb-3" style="color:var(--primary)"><i class="bi bi-journal-text me-2"></i>問題別採点結果</h5>
 
-{% set q_counter = namespace(n=0) %}
 {% for scene in scene_order %}
 {% if scene in answers_by_scene %}
 {% set scene_answers = answers_by_scene[scene] %}
@@ -417,8 +413,9 @@
     <span class="fw-bold">{{ s_total }} / {{ s_max }}点 ({{ s_pct }}%)</span>
   </div>
 
+  {% set q_scene = namespace(n=0) %}
   {% for ans in scene_answers %}
-  {% set q_counter.n = q_counter.n + 1 %}
+  {% set q_scene.n = q_scene.n + 1 %}
   {% set total_q = ans.competency_scores.values() | sum %}
   {% set max_q   = ans.competencies | length * 2 %}
   {% set pct_q   = (total_q / max_q * 100) | round(0) | int if max_q > 0 else 0 %}
@@ -426,7 +423,7 @@
   <div class="card mb-2 question-card" style="border-radius:0{% if loop.last %} 0 0 8px 8px{% endif %}">
     <div class="card-header d-flex justify-content-between align-items-center py-2" style="background:#f0f4f8">
       <div>
-        <span class="badge bg-secondary me-1">問{{ q_counter.n }}</span>
+        <span class="badge bg-secondary me-1">問{{ q_scene.n }}</span>
         <span class="badge bg-light text-dark border me-1">{{ ans.question_type }}</span>
         <span class="fw-bold small">{{ ans.question_text | strip_comp_note }}</span>
       </div>

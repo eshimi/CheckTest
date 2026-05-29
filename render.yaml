@@ -3,14 +3,22 @@ services:
     name: disaster-test-2026
     env: python
     region: singapore
-    plan: free
+    plan: starter
     buildCommand: |
       pip install -r requirements.txt
       python -m playwright install chromium
       python -m playwright install-deps chromium
-    startCommand: gunicorn app:app --workers=1 --timeout=180 --bind 0.0.0.0:$PORT
+    startCommand: gunicorn app:app --workers=1 --timeout=300 --bind 0.0.0.0:$PORT
+    disk:
+      name: bousai-data
+      mountPath: /data
+      sizeGB: 1
     envVars:
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: FLASK_SECRET_KEY
         generateValue: true
+      - key: BASIC_AUTH_USERNAME
+        sync: false
+      - key: BASIC_AUTH_PASSWORD
+        sync: false

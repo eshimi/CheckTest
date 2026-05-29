@@ -613,67 +613,73 @@ def calc_scene_scores(examinee):
     return result
 
 
-def build_overall_comment(examinee, scene_scores):
-    """スコアから総合評価コメントを生成"""
+def build_overall_comment(examinee, scene_scores, comp_comments=None):
+    """スコアから総合評価コメントを生成（コンピテンシー別コメントと矛盾しない設計）"""
     comp_rates = examinee.get("comp_rates", {})
     pct = examinee.get("percentage", 0)
-    name = _mask_id(examinee.get("id", "受験者"))
 
-    # コンピテンシーを得点率でソート（成長余地の判定に使用）
+    # 実際の得点率に基づいてコンピテンシーを分類（名前に依存しない）
     sorted_comps = sorted(comp_rates.items(), key=lambda x: x[1], reverse=True)
-    grow_comps   = [(c, r) for c, r in sorted_comps if r < 70]
+    strong_comps = [(c, r) for c, r in sorted_comps if r >= 80]   # 実際に高いもの
+    grow_comps   = [(c, r) for c, r in sorted_comps if r < 70]    # 実際に低いもの
 
-    # ① 導入：現状の客観的評価とありたい姿との対応
+    # ① 総評（導入）：全体得点率のみに基づく。コンピテンシー名は挙げない
     if pct >= 80:
         intro = (
             f"総合得点率{pct}%。"
-            f"収集した情報からリスク・影響を先読みし、組織全体を俯瞰して優先順位を判断・意思決定する"
-            f"災害対策員のありたい姿を、複数のシーンにわたって発揮できています。"
-            f"不確実な状況下でも情報を整理し、班として取るべき行動を的確に判断する力が"
-            f"一貫して示されました。"
+            f"災害対策員として求められる情報の収集・分析・判断・伝達の各場面において、"
+            f"高い水準の対応力を発揮できています。"
+            f"不確実な状況下でも状況を整理し、班として取るべき行動を的確に選択する力が"
+            f"シーンを通じて一貫して示されました。"
         )
     elif pct >= 65:
         intro = (
             f"総合得点率{pct}%。"
-            f"クリティカルな情報を見極め、分かりやすく伝える災害対策員として求められる水準に達しています。"
-            f"班での情報共有・応急復旧において状況を把握し適切に伝達する基盤は身についていますが、"
-            f"先読みや組織全体を俯瞰した判断という点には、まだ伸びしろがあります。"
+            f"災害対策員として求められる情報共有・応急復旧対応の基本的な枠組みは"
+            f"概ね身についており、標準的な水準に達しています。"
+            f"一部の領域にはさらなる成長の余地がありますが、"
+            f"実践を重ねることで着実な向上が期待できます。"
         )
     elif pct >= 50:
         intro = (
             f"総合得点率{pct}%。"
-            f"情報共有・応急復旧の基本的な枠組みは理解できていますが、"
-            f"クリティカルな情報を判断して分かりやすく伝える災害対策員として求められる水準には"
-            f"まだ達していない部分があります。"
-            f"今回の試験で確認できた具体的な課題を起点に、改善を進めてください。"
+            f"情報共有・応急復旧の基本的な方向性は理解できていますが、"
+            f"災害対策員として求められる判断の精度と伝達の明確さに"
+            f"改善が必要な部分が見られました。"
+            f"今回の試験で確認できた課題を起点に、具体的な改善に取り組んでください。"
         )
     else:
         intro = (
             f"総合得点率{pct}%。"
             f"情報収集・分析・共有のいずれかの場面で対応の精度に課題が見られ、"
-            f"班での応急復旧活動に必要な基本的な判断力・伝達力の強化が求められます。"
+            f"班での応急復旧活動に必要な判断力・伝達力の強化が求められます。"
             f"本試験で明らかになった課題を正確に把握し、具体的な改善に取り組んでください。"
         )
 
-    # ② 改善方向：ありたい姿との具体的なギャップを示す
+    # 強みへの言及：実際に高いコンピテンシーのみ
+    if strong_comps:
+        strong_names = "・".join(f"「{c}」" for c, _ in strong_comps[:2])
+        intro += (
+            f"特に{strong_names}については高い水準を示しており、"
+            f"この強みを今後の災対活動でも継続して発揮してください。"
+        )
+
+    # ② 改善提案：実際に低いコンピテンシーのみ言及
     if grow_comps:
         grow_names = "・".join(f"「{c}」" for c, _ in grow_comps[:2])
-        if pct >= 65:
-            gap_desc = "災害対策員のありたい姿である「先読みと組織全体を俯瞰した意思決定」"
-        else:
-            gap_desc = "災害対策員として求められる「クリティカルな情報の判断と分かりやすい伝達」"
         growth_comment = (
-            f"特に{grow_names}において、{gap_desc}との間にギャップがあります。"
-            f"班での情報共有・応急復旧の場面を意識した実践的な取り組みの中で、"
-            f"これらのコンピテンシーを具体的に鍛えることが次のステップです。"
-            f"各コンピテンシー別の評価コメントに記載した改善点を参照し、"
-            f"日常の災対活動の中で意識的に実践してください。"
+            f"{grow_names}については、コンピテンシー別の評価コメントに"
+            f"記載した改善点を参照し、日常の災対活動の中で意識的に実践することが"
+            f"次のステップです。"
+            f"班での情報共有・応急復旧の場面を具体的に意識しながら、"
+            f"これらの能力を着実に高めていってください。"
         )
     else:
         growth_comment = (
-            f"全コンピテンシーで高い水準を達成しています。"
-            f"今後は、より不確実性が高い局面や複数課題が同時発生する場面での判断精度の維持が課題です。"
-            f"また、自身の災対経験から気づいた改善点を言語化し、具体的な提案として実践していくことが"
+            f"今後は、より不確実性が高い局面や複数課題が同時発生する場面での"
+            f"判断精度の維持・向上が課題です。"
+            f"自身の災対経験から気づいた改善点を言語化し、"
+            f"具体的な提案として実践していくことが"
             f"災害対策員としてのさらなる成長につながります。"
         )
 
@@ -850,10 +856,10 @@ def report(session_id, examinee_id):
     now = datetime.date.today().strftime("%Y年%m月%d日")
     genre_stats     = calc_genre_stats(results, examinee)
     scene_scores    = calc_scene_scores(examinee)
-    overall_comment = build_overall_comment(examinee, scene_scores)
+    comp_comments   = build_comp_comments(examinee)
+    overall_comment = build_overall_comment(examinee, scene_scores, comp_comments)
     scene_comments  = build_scene_comments(scene_scores)
     avg_comp_rates  = calc_all_avg_comp_rates(results)
-    comp_comments   = build_comp_comments(examinee)
 
     # シーン順に並んだ問題リスト（グループ化用）
     answers_by_scene = {}
@@ -884,8 +890,8 @@ def download_report(session_id, examinee_id):
     if not examinee:
         return "受験者が見つかりません", 404
     scene_scores = calc_scene_scores(examinee)
-    overall_comment = build_overall_comment(examinee, scene_scores)
     comp_comments = build_comp_comments(examinee)
+    overall_comment = build_overall_comment(examinee, scene_scores, comp_comments)
     docx_path = RESULTS_DIR / session_id / f"report_{examinee_id}.docx"
     generate_word_report(examinee, str(docx_path),
                          scene_scores=scene_scores, overall_comment=overall_comment,
