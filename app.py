@@ -9,6 +9,8 @@ for _pyc in _glob.glob(os.path.join(os.path.dirname(__file__), "__pycache__", "g
 
 import uuid
 import datetime
+import zoneinfo
+_JST = zoneinfo.ZoneInfo("Asia/Tokyo")
 import base64
 from pathlib import Path
 from flask import Flask, render_template, request, jsonify, send_file, redirect, url_for, Response
@@ -992,7 +994,7 @@ def sessions_list():
             if not results:
                 continue
             graded_at = datetime.datetime.fromtimestamp(
-                summary_path.stat().st_mtime).strftime("%Y年%m月%d日 %H:%M")
+                summary_path.stat().st_mtime, tz=_JST).strftime("%Y年%m月%d日 %H:%M")
             genres = sorted({r.get("genre", "") for r in results if r.get("genre")})
             avg_pct = round(sum(r["percentage"] for r in results) / len(results), 1)
             sessions.append({
