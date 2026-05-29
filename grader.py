@@ -622,7 +622,7 @@ def grade_exam(questions_df, answers_df, column_mapping, results_dir):
 
 import re as _re
 
-print("=== GRADER VERSION 2026-05-29-A LOADED ===", flush=True)
+print("=== GRADER VERSION 2026-05-29-B LOADED ===", flush=True)
 
 _COMP_NAME_MAP = {
     'コミュニケーション力': 'コミュニケーション',
@@ -819,8 +819,41 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb
                 "question_genre": scene,
                 "answer_text":    raw_ans,
                 "competencies":   comps,
+                "_rubrics":       rubrics,
             })
             graded_answers.append(result)
+
+        # ── パス2：シーン内クロス評価（別問題の回答で格上げ） ─────────────
+        scene_buckets_lms = {}
+        for ga in graded_answers:
+            sn = ga.get("question_genre", "")
+            if sn:
+                scene_buckets_lms.setdefault(sn, []).append(ga)
+
+        for scene_name, scene_qs in scene_buckets_lms.items():
+            _dlog(f"PASS2 START: {scene_name} ({len(scene_qs)}問)")
+            upgrades = review_scene(scene_name, scene_qs)
+            _dlog(f"PASS2 RESULT: {scene_name} → 格上げ{len(upgrades)}件: {list(upgrades.keys())}")
+            for (q_id, comp), upg in upgrades.items():
+                for ga in graded_answers:
+                    if ga["question_id"] == q_id and comp in ga.get("competency_scores", {}):
+                        old_s = ga["competency_scores"][comp]
+                        new_s = upg["new_score"]
+                        if new_s > old_s:
+                            ga["competency_scores"][comp] = new_s
+                            old_reason = ga.get("competency_reasons", {}).get(comp, "")
+                            ga.setdefault("competency_reasons", {})[comp] = (
+                                old_reason + f"　※シーン内別問題の回答を考慮して{old_s}点→{new_s}点に格上げ（{upg['reason']}）"
+                            )
+                            _dlog(f"  UPGRADE: {q_id} {comp} {old_s}→{new_s}")
+
+        # _rubrics 削除・comp_totals 再集計（格上げ反映）
+        comp_totals = {}
+        for ga in graded_answers:
+            ga.pop("_rubrics", None)
+            for c, s in ga["competency_scores"].items():
+                if c in comp_max:
+                    comp_totals[c] = comp_totals.get(c, 0) + s
 
         used_comps  = [c for c in _ALL_COMPS if c in comp_totals]
         total_score = sum(comp_totals.values())
