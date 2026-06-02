@@ -138,44 +138,63 @@ def _clean_columns(df):
     return df
 
 
+def _detect_excel_type(fp: Path) -> str:
+    """ファイル先頭バイト（マジックナンバー）から実際の形式を判定する。
+    拡張子ではなく内容で判定するため、.csvと偽装された.xlsも正しく検出できる。
+    """
+    try:
+        with open(fp, "rb") as f:
+            header = f.read(8)
+    except Exception:
+        return "csv"
+    if header[:4] == b"\xd0\xcf\x11\xe0":   # OLE2 compound doc（.xls / .doc / .ppt）
+        return "xls"
+    if header[:4] == b"PK\x03\x04":          # ZIP（.xlsx / .docx など）
+        return "xlsx"
+    return "csv"
+
+
 def load_excel(filepath):
     import csv as _csv
     fp = Path(filepath)
-    if fp.suffix.lower() == ".csv":
-        import chardet
-        raw = fp.read_bytes()
-        detected = chardet.detect(raw)
-        enc_detected = detected.get("encoding") or "cp932"
-        candidates = [enc_detected, "utf-8-sig", "cp932", "shift_jis", "utf-8", "latin-1"]
-        seen = set()
-        for enc in candidates:
-            if enc in seen:
-                continue
-            seen.add(enc)
-            # フェーズ1: 通常読み込み（区切り文字自動検出）
-            try:
-                df = pd.read_csv(fp, encoding=enc, sep=None, engine="python")
-                return _clean_columns(df)
-            except (UnicodeDecodeError, ValueError, _csv.Error):
-                pass
-            # フェーズ2: 引用符エラー耐性モード（回答内の " に対応）
-            try:
-                df = pd.read_csv(fp, encoding=enc, sep=None, engine="python",
-                                 quoting=_csv.QUOTE_NONE, escapechar="\\",
-                                 on_bad_lines="skip")
-                return _clean_columns(df)
-            except (UnicodeDecodeError, ValueError, _csv.Error):
-                continue
-        # 最終フォールバック
-        df = pd.read_csv(fp, encoding="latin-1", sep=None, engine="python",
-                         on_bad_lines="skip")
-        return _clean_columns(df)
-    # xlsx / xls
-    try:
-        df = pd.read_excel(fp)
-    except Exception:
-        # openpyxl で失敗した場合は xlrd で再試行（xls 形式など）
-        df = pd.read_excel(fp, engine="xlrd")
+
+    # 拡張子に関わらず内容で形式判定
+    file_type = _detect_excel_type(fp)
+
+    if file_type == "xls":
+        return _clean_columns(pd.read_excel(fp, engine="xlrd"))
+
+    if file_type == "xlsx":
+        return _clean_columns(pd.read_excel(fp, engine="openpyxl"))
+
+    # テキスト系（CSV / TSV）
+    import chardet
+    raw = fp.read_bytes()
+    detected = chardet.detect(raw)
+    enc_detected = detected.get("encoding") or "cp932"
+    candidates = [enc_detected, "utf-8-sig", "cp932", "shift_jis", "utf-8", "latin-1"]
+    seen = set()
+    for enc in candidates:
+        if enc in seen:
+            continue
+        seen.add(enc)
+        # フェーズ1: 通常読み込み（区切り文字自動検出）
+        try:
+            df = pd.read_csv(fp, encoding=enc, sep=None, engine="python")
+            return _clean_columns(df)
+        except (UnicodeDecodeError, ValueError, _csv.Error):
+            pass
+        # フェーズ2: 引用符エラー耐性モード（回答内の " に対応）
+        try:
+            df = pd.read_csv(fp, encoding=enc, sep=None, engine="python",
+                             quoting=_csv.QUOTE_NONE, escapechar="\\",
+                             on_bad_lines="skip")
+            return _clean_columns(df)
+        except (UnicodeDecodeError, ValueError, _csv.Error):
+            continue
+    # 最終フォールバック
+    df = pd.read_csv(fp, encoding="latin-1", sep=None, engine="python",
+                     on_bad_lines="skip")
     return _clean_columns(df)
 
 
