@@ -138,44 +138,78 @@ def _clean_columns(df):
     return df
 
 
+def _is_sane_df(df) -> bool:
+    """DataFrameが文字化けしていないかチェックする。
+    バイナリをCSVとして読んだ場合は列名に制御文字が混入するため検出できる。
+    """
+    if df is None or df.empty or len(df.columns) == 0:
+        return False
+    for col in df.columns:
+        s = str(col)
+        # 制御文字（タブ・改行・復帰以外）が1文字でもあれば文字化け
+        if any(ord(c) < 0x20 and c not in '\t\n\r' for c in s):
+            return False
+        # 1列名に非ASCII文字が80%超 → バイナリ起因の化け
+        non_ascii = sum(1 for c in s if ord(c) > 0x7E)
+        if len(s) > 3 and non_ascii / len(s) > 0.8:
+            return False
+    return True
+
+
 def load_excel(filepath):
     """
     あらゆる形式の表形式ファイルを読み込む。
-    拡張子に依存せず、複数のパーサーを順番に試してDataFrameを返す。
-    対応形式: xlsx / xls（バイナリ）/ HTML偽装xls（LMSエクスポート）/ CSV / TSV
+    拡張子に依存せず複数パーサーを順番に試し、文字化けチェックを通過したものを返す。
+    対応形式: xlsx / xls / HTML偽装xls（LMS特有）/ CSV / TSV
     """
     import csv as _csv
     fp = Path(filepath)
     errors = []
 
+    # ファイル先頭バイトで形式を推定（ヒントとして使用）
+    try:
+        with open(fp, "rb") as f:
+            magic = f.read(4)
+    except Exception:
+        magic = b""
+    is_binary = magic[:4] in (b"\xd0\xcf\x11\xe0", b"PK\x03\x04")
+
     # ① xlsx（openpyxl）
     try:
-        return _clean_columns(pd.read_excel(fp, engine="openpyxl"))
+        df = pd.read_excel(fp, engine="openpyxl")
+        if _is_sane_df(df):
+            return _clean_columns(df)
+        errors.append("openpyxl: 読めたが文字化け")
     except Exception as e:
         errors.append(f"openpyxl: {e}")
 
     # ② xls バイナリ（xlrd）
     try:
-        return _clean_columns(pd.read_excel(fp, engine="xlrd"))
+        df = pd.read_excel(fp, engine="xlrd")
+        if _is_sane_df(df):
+            return _clean_columns(df)
+        errors.append("xlrd: 読めたが文字化け")
     except Exception as e:
         errors.append(f"xlrd: {e}")
 
     # ③ HTML形式の"偽装xls"（LMSがHTML tableをxlsとして出力するケース）
-    try:
-        tables = pd.read_html(str(fp), encoding="utf-8")
-        if tables:
-            return _clean_columns(tables[0])
-    except Exception as e:
-        errors.append(f"html(utf-8): {e}")
-    for enc in ("cp932", "shift_jis", "utf-8-sig"):
+    for enc in ("utf-8", "utf-8-sig", "cp932", "shift_jis"):
         try:
             tables = pd.read_html(str(fp), encoding=enc)
-            if tables:
+            if tables and _is_sane_df(tables[0]):
                 return _clean_columns(tables[0])
         except Exception as e:
             errors.append(f"html({enc}): {e}")
 
-    # ④ CSV / TSV（複数エンコーディングを試行）
+    # バイナリファイルでここまで全滅 → CSVではないので明確にエラー
+    if is_binary:
+        raise ValueError(
+            "Excelファイルの読み込みに失敗しました。\n"
+            "LMSのエクスポート画面で「CSV（カンマ区切り）」か「xlsx形式」を選択し直してください。\n"
+            f"（試行結果: {' | '.join(errors[-3:])}）"
+        )
+
+    # ④ CSV / TSV（テキスト系ファイル）
     import chardet
     raw = fp.read_bytes()
     detected = chardet.detect(raw)
@@ -186,30 +220,24 @@ def load_excel(filepath):
         if enc in seen:
             continue
         seen.add(enc)
-        try:
-            df = pd.read_csv(fp, encoding=enc, sep=None, engine="python")
-            return _clean_columns(df)
-        except (UnicodeDecodeError, ValueError, _csv.Error) as e:
-            errors.append(f"csv({enc}): {e}")
-            pass
-        try:
-            df = pd.read_csv(fp, encoding=enc, sep=None, engine="python",
-                             quoting=_csv.QUOTE_NONE, escapechar="\\",
-                             on_bad_lines="skip")
-            return _clean_columns(df)
-        except (UnicodeDecodeError, ValueError, _csv.Error) as e:
-            errors.append(f"csv-noquote({enc}): {e}")
-            continue
+        for kwargs in [
+            {"sep": None, "engine": "python"},
+            {"sep": None, "engine": "python",
+             "quoting": _csv.QUOTE_NONE, "escapechar": "\\", "on_bad_lines": "skip"},
+        ]:
+            try:
+                df = pd.read_csv(fp, encoding=enc, **kwargs)
+                if _is_sane_df(df):
+                    return _clean_columns(df)
+                errors.append(f"csv({enc}): 読めたが文字化け")
+            except (UnicodeDecodeError, ValueError, _csv.Error) as e:
+                errors.append(f"csv({enc}): {e}")
 
-    # ⑤ 最終フォールバック
-    try:
-        df = pd.read_csv(fp, encoding="latin-1", sep=None, engine="python",
-                         on_bad_lines="skip")
-        return _clean_columns(df)
-    except Exception as e:
-        errors.append(f"csv(latin-1): {e}")
-
-    raise ValueError("ファイル形式を認識できませんでした。xlsx / xls / CSV形式でエクスポートし直してください。\n詳細: " + " | ".join(errors[-3:]))
+    raise ValueError(
+        "ファイル形式を認識できませんでした。\n"
+        "xlsx / xls / CSV形式でエクスポートし直してください。\n"
+        f"詳細: {' | '.join(errors[-4:])}"
+    )
 
 
 def list_exams():
