@@ -139,6 +139,7 @@ def _clean_columns(df):
 
 
 def load_excel(filepath):
+    import csv as _csv
     fp = Path(filepath)
     if fp.suffix.lower() == ".csv":
         import chardet
@@ -151,15 +152,30 @@ def load_excel(filepath):
             if enc in seen:
                 continue
             seen.add(enc)
+            # フェーズ1: 通常読み込み（区切り文字自動検出）
             try:
-                # sep=None + engine='python' で区切り文字を自動検出
                 df = pd.read_csv(fp, encoding=enc, sep=None, engine="python")
                 return _clean_columns(df)
-            except (UnicodeDecodeError, ValueError):
+            except (UnicodeDecodeError, ValueError, _csv.Error):
+                pass
+            # フェーズ2: 引用符エラー耐性モード（回答内の " に対応）
+            try:
+                df = pd.read_csv(fp, encoding=enc, sep=None, engine="python",
+                                 quoting=_csv.QUOTE_NONE, escapechar="\\",
+                                 on_bad_lines="skip")
+                return _clean_columns(df)
+            except (UnicodeDecodeError, ValueError, _csv.Error):
                 continue
-        df = pd.read_csv(fp, encoding="latin-1", sep=None, engine="python")
+        # 最終フォールバック
+        df = pd.read_csv(fp, encoding="latin-1", sep=None, engine="python",
+                         on_bad_lines="skip")
         return _clean_columns(df)
-    df = pd.read_excel(fp)
+    # xlsx / xls
+    try:
+        df = pd.read_excel(fp)
+    except Exception:
+        # openpyxl で失敗した場合は xlrd で再試行（xls 形式など）
+        df = pd.read_excel(fp, engine="xlrd")
     return _clean_columns(df)
 
 
