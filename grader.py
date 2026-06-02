@@ -167,6 +167,7 @@ REVIEW_SYSTEM_PROMPT = """あなたは防災・危機管理分野の専門家で
 - 0点の問題：採点基準の最低要件（1点相当の内容）が別問題の回答に明示されている場合のみ格上げ可。「一般的な注意深さ」や「全体的な意識の高さ」を根拠に0点から格上げしない
 - 確認行為・既存ツールの活用のみの記述：「原因を確認する」「管理シートのフラグを変更する」等は想像・先読みコンピテンシーの格上げ根拠にならない
 - 間接的・付随的な言及：「〜かもしれない」「余裕があれば〜」等の一文以下の付随的記述は格上げ根拠にならない
+- 格上げ対象問題自身の回答を根拠とした格上げ禁止：格上げの根拠は必ず「格上げ対象とは異なる別の問題の回答」であること。例えば「シーン1 問8」を格上げする場合、根拠は「シーン1 問8」以外の問題の回答でなければならない。同一問題の回答内容を、その問題自身の格上げ根拠に使うことは禁止
 
 【格上げのルール】
 - 格上げは最大1点（例：1点→2点、2点→3点）
@@ -179,7 +180,8 @@ def build_review_prompt(scene_name: str, graded_scene_questions: list) -> str:
     """シーン内の全問題・回答・初期スコアを渡してクロス評価を依頼するプロンプトを構築"""
     blocks = []
     for i, gq in enumerate(graded_scene_questions, 1):
-        q_id = gq.get("question_id", f"Q{i}")
+        # _display_label があればそちらを使用（例：「シーン1 問8」）
+        q_id = gq.get("_display_label", gq.get("question_id", f"Q{i}"))
         q_text = gq.get("question_text", "")
         answer = gq.get("answer_text", "（無回答）")
         comps = gq.get("competencies", [])
@@ -199,15 +201,15 @@ def build_review_prompt(scene_name: str, graded_scene_questions: list) -> str:
             f"【現在のスコア】{score_str}"
         )
 
-    upgrade_keys = '[\n    {"question_id": "<問題ID>", "competency": "<コンピテンシー名>", "old_score": <旧スコア>, "new_score": <新スコア>, "reason": "<格上げ理由（他のどの問題の回答が根拠か）>"}\n  ]'
+    upgrade_keys = '[\n    {"question_id": "<問題の表示名（例：シーン1 問3）>", "competency": "<コンピテンシー名>", "old_score": <旧スコア>, "new_score": <新スコア>, "reason": "<格上げ理由（格上げ対象とは別のどの問題の回答が根拠か、具体的に記述）>"}\n  ]'
 
     return f"""以下は「{scene_name}」における受験者の全回答と初期採点スコアです。
 受験者はシーン全体を通じて回答しています。ある問題で低得点のコンピテンシーがあっても、
-同シーン内の別問題の回答にその行動・考え方が示されていれば、積極的に格上げしてください。
+同シーン内の別問題の回答にその行動・考え方が示されていれば、格上げを検討してください。
 
 特に注目すること：
 - スコアが1点以下のコンピテンシーに対して、他の問題の回答にその要件を満たす記述がないか確認する
-- 「直接言及していないが、別問題の回答から意識・行動が読み取れる」場合も格上げ対象
+- 格上げの根拠は必ず「格上げ対象とは異なる別の問題の回答」であること
 
 {chr(10).join(blocks)}
 
@@ -222,7 +224,7 @@ def build_review_prompt(scene_name: str, graded_scene_questions: list) -> str:
 def review_scene(scene_name: str, graded_scene_questions: list) -> dict:
     """
     シーン内の全問題を俯瞰して格上げが必要なスコアを返す。
-    Returns: {(question_id, competency): new_score}
+    Returns: {(question_id, competency): {"new_score": int, "reason": str}}
     """
     if len(graded_scene_questions) < 2:
         return {}
@@ -230,6 +232,13 @@ def review_scene(scene_name: str, graded_scene_questions: list) -> dict:
     non_zero = [gq for gq in graded_scene_questions if not gq.get("forced_zero", False)]
     if not non_zero:
         return {}
+
+    # シーン内表示番号を付与（例：「シーン1 問8」）し、元のIDへの逆引きマップを作成
+    label_to_qid = {}
+    for i, gq in enumerate(graded_scene_questions, 1):
+        display = f"{scene_name} 問{i}"
+        gq["_display_label"] = display
+        label_to_qid[display] = gq.get("question_id", f"Q{i:02d}")
 
     prompt = build_review_prompt(scene_name, graded_scene_questions)
     response = client.messages.create(
@@ -256,7 +265,9 @@ def review_scene(scene_name: str, graded_scene_questions: list) -> dict:
     upgrades = {}
     for u in result.get("upgrades", []):
         try:
-            q_id = u["question_id"]
+            ai_label = u["question_id"]
+            # 表示ラベル（例：「シーン1 問8」）を元の question_id にマップバック
+            q_id = label_to_qid.get(ai_label, ai_label)
             comp = _COMP_NAME_MAP.get(u["competency"].strip(), u["competency"].strip())
             old_s = int(u["old_score"])
             new_s = int(u["new_score"])
@@ -477,9 +488,10 @@ def grade_exam_group_based(group_questions: dict, answers_df, column_mapping: di
                             )
                             _dlog(f"  UPGRADE: {q_id} {comp} {old_s}→{new_s}")
 
-        # _rubrics はAPIレスポンス用途外なので削除
+        # _rubrics / _display_label はAPIレスポンス用途外なので削除
         for ga in graded_answers:
             ga.pop("_rubrics", None)
+            ga.pop("_display_label", None)
 
         # ── 集計 ─────────────────────────────────────────────────────────
         comp_totals = {c: 0 for c in comp_cols}
@@ -626,7 +638,7 @@ def grade_exam(questions_df, answers_df, column_mapping, results_dir):
 
 import re as _re
 
-print("=== GRADER VERSION 2026-05-29-C LOADED ===", flush=True)
+print("=== GRADER VERSION 2026-06-02-A LOADED ===", flush=True)
 
 _COMP_NAME_MAP = {
     'コミュニケーション力': 'コミュニケーション',
@@ -851,10 +863,11 @@ def grade_tall_format(answers_df, column_mapping: dict, results_dir, progress_cb
                             )
                             _dlog(f"  UPGRADE: {q_id} {comp} {old_s}→{new_s}")
 
-        # _rubrics 削除・comp_totals 再集計（格上げ反映）
+        # _rubrics / _display_label 削除・comp_totals 再集計（格上げ反映）
         comp_totals = {}
         for ga in graded_answers:
             ga.pop("_rubrics", None)
+            ga.pop("_display_label", None)
             for c, s in ga["competency_scores"].items():
                 if c in comp_max:
                     comp_totals[c] = comp_totals.get(c, 0) + s
