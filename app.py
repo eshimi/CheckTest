@@ -195,7 +195,7 @@ def load_excel(filepath):
     # ③ HTML形式の"偽装xls"（LMSがHTML tableをxlsとして出力するケース）
     for enc in ("utf-8", "utf-8-sig", "cp932", "shift_jis"):
         try:
-            tables = pd.read_html(str(fp), encoding=enc)
+            tables = pd.read_html(str(fp), encoding=enc, flavor="lxml")
             if tables and _is_sane_df(tables[0]):
                 return _clean_columns(tables[0])
         except Exception as e:
