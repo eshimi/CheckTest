@@ -138,36 +138,44 @@ def _clean_columns(df):
     return df
 
 
-def _detect_excel_type(fp: Path) -> str:
-    """ファイル先頭バイト（マジックナンバー）から実際の形式を判定する。
-    拡張子ではなく内容で判定するため、.csvと偽装された.xlsも正しく検出できる。
-    """
-    try:
-        with open(fp, "rb") as f:
-            header = f.read(8)
-    except Exception:
-        return "csv"
-    if header[:4] == b"\xd0\xcf\x11\xe0":   # OLE2 compound doc（.xls / .doc / .ppt）
-        return "xls"
-    if header[:4] == b"PK\x03\x04":          # ZIP（.xlsx / .docx など）
-        return "xlsx"
-    return "csv"
-
-
 def load_excel(filepath):
+    """
+    あらゆる形式の表形式ファイルを読み込む。
+    拡張子に依存せず、複数のパーサーを順番に試してDataFrameを返す。
+    対応形式: xlsx / xls（バイナリ）/ HTML偽装xls（LMSエクスポート）/ CSV / TSV
+    """
     import csv as _csv
     fp = Path(filepath)
+    errors = []
 
-    # 拡張子に関わらず内容で形式判定
-    file_type = _detect_excel_type(fp)
-
-    if file_type == "xls":
-        return _clean_columns(pd.read_excel(fp, engine="xlrd"))
-
-    if file_type == "xlsx":
+    # ① xlsx（openpyxl）
+    try:
         return _clean_columns(pd.read_excel(fp, engine="openpyxl"))
+    except Exception as e:
+        errors.append(f"openpyxl: {e}")
 
-    # テキスト系（CSV / TSV）
+    # ② xls バイナリ（xlrd）
+    try:
+        return _clean_columns(pd.read_excel(fp, engine="xlrd"))
+    except Exception as e:
+        errors.append(f"xlrd: {e}")
+
+    # ③ HTML形式の"偽装xls"（LMSがHTML tableをxlsとして出力するケース）
+    try:
+        tables = pd.read_html(str(fp), encoding="utf-8")
+        if tables:
+            return _clean_columns(tables[0])
+    except Exception as e:
+        errors.append(f"html(utf-8): {e}")
+    for enc in ("cp932", "shift_jis", "utf-8-sig"):
+        try:
+            tables = pd.read_html(str(fp), encoding=enc)
+            if tables:
+                return _clean_columns(tables[0])
+        except Exception as e:
+            errors.append(f"html({enc}): {e}")
+
+    # ④ CSV / TSV（複数エンコーディングを試行）
     import chardet
     raw = fp.read_bytes()
     detected = chardet.detect(raw)
@@ -178,24 +186,30 @@ def load_excel(filepath):
         if enc in seen:
             continue
         seen.add(enc)
-        # フェーズ1: 通常読み込み（区切り文字自動検出）
         try:
             df = pd.read_csv(fp, encoding=enc, sep=None, engine="python")
             return _clean_columns(df)
-        except (UnicodeDecodeError, ValueError, _csv.Error):
+        except (UnicodeDecodeError, ValueError, _csv.Error) as e:
+            errors.append(f"csv({enc}): {e}")
             pass
-        # フェーズ2: 引用符エラー耐性モード（回答内の " に対応）
         try:
             df = pd.read_csv(fp, encoding=enc, sep=None, engine="python",
                              quoting=_csv.QUOTE_NONE, escapechar="\\",
                              on_bad_lines="skip")
             return _clean_columns(df)
-        except (UnicodeDecodeError, ValueError, _csv.Error):
+        except (UnicodeDecodeError, ValueError, _csv.Error) as e:
+            errors.append(f"csv-noquote({enc}): {e}")
             continue
-    # 最終フォールバック
-    df = pd.read_csv(fp, encoding="latin-1", sep=None, engine="python",
-                     on_bad_lines="skip")
-    return _clean_columns(df)
+
+    # ⑤ 最終フォールバック
+    try:
+        df = pd.read_csv(fp, encoding="latin-1", sep=None, engine="python",
+                         on_bad_lines="skip")
+        return _clean_columns(df)
+    except Exception as e:
+        errors.append(f"csv(latin-1): {e}")
+
+    raise ValueError("ファイル形式を認識できませんでした。xlsx / xls / CSV形式でエクスポートし直してください。\n詳細: " + " | ".join(errors[-3:]))
 
 
 def list_exams():
