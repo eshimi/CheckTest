@@ -141,6 +141,7 @@ def _clean_columns(df):
 def _is_sane_df(df) -> bool:
     """DataFrameが文字化けしていないかチェックする。
     バイナリをCSVとして読んだ場合は列名に制御文字が混入するため検出できる。
+    日本語列名（ひらがな・カタカナ・漢字）は正当なものとして許可する。
     """
     if df is None or df.empty or len(df.columns) == 0:
         return False
@@ -149,10 +150,19 @@ def _is_sane_df(df) -> bool:
         # 制御文字（タブ・改行・復帰以外）が1文字でもあれば文字化け
         if any(ord(c) < 0x20 and c not in '\t\n\r' for c in s):
             return False
-        # 1列名に非ASCII文字が80%超 → バイナリ起因の化け
-        non_ascii = sum(1 for c in s if ord(c) > 0x7E)
-        if len(s) > 3 and non_ascii / len(s) > 0.8:
-            return False
+        # 非ASCII文字が多い場合、日本語文字（ひらがな・カタカナ・漢字・記号）かを確認
+        non_ascii_chars = [c for c in s if ord(c) > 0x7E]
+        if len(s) > 3 and len(non_ascii_chars) / len(s) > 0.8:
+            # 日本語Unicodeレンジ: U+3000-U+9FFF（ひらがな/カタカナ/漢字）
+            #                      U+FF00-U+FFEF（全角英数・半角カタカナ）
+            #                      U+F900-U+FAFF（CJK互換漢字）
+            jp_count = sum(1 for c in non_ascii_chars if
+                           0x3000 <= ord(c) <= 0x9FFF or
+                           0xFF00 <= ord(c) <= 0xFFEF or
+                           0xF900 <= ord(c) <= 0xFAFF)
+            if len(non_ascii_chars) > 0 and jp_count / len(non_ascii_chars) < 0.5:
+                # 非ASCII文字の半分未満しか日本語でない → バイナリ起因の文字化け
+                return False
     return True
 
 
