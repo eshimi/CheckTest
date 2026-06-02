@@ -193,13 +193,21 @@ def load_excel(filepath):
         errors.append(f"xlrd: {e}")
 
     # ③ HTML形式の"偽装xls"（LMSがHTML tableをxlsとして出力するケース）
-    for enc in ("utf-8", "utf-8-sig", "cp932", "shift_jis"):
-        try:
-            tables = pd.read_html(str(fp), encoding=enc, flavor="lxml")
-            if tables and _is_sane_df(tables[0]):
-                return _clean_columns(tables[0])
-        except Exception as e:
-            errors.append(f"html({enc}): {e}")
+    # lxmlがバイト型エンコーディングを返すバグを避けるため、自分でデコードしてStringIOで渡す
+    try:
+        raw_bytes = fp.read_bytes()
+    except Exception:
+        raw_bytes = None
+
+    if raw_bytes:
+        for enc in ("utf-8-sig", "cp932", "shift_jis", "utf-8"):
+            try:
+                decoded = raw_bytes.decode(enc)
+                tables = pd.read_html(io.StringIO(decoded), flavor="lxml")
+                if tables and _is_sane_df(tables[0]):
+                    return _clean_columns(tables[0])
+            except Exception as e:
+                errors.append(f"html({enc}): {e}")
 
     # バイナリファイルでここまで全滅 → CSVではないので明確にエラー
     if is_binary:
