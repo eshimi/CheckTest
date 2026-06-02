@@ -476,6 +476,9 @@ def grade():
         results_dir = RESULTS_DIR / session_id
         results_dir.mkdir(parents=True, exist_ok=True)
         progress_path = results_dir / "progress.json"
+        # 列マッピングを保存（再開時に使用）
+        with open(results_dir / "column_mapping.json", "w", encoding="utf-8") as f:
+            json.dump(merged_mapping, f, ensure_ascii=False)
         import time as _time
         _started_at = _time.time()
         _total_est_tf = answers_df[answers_df.columns[0]].dropna().nunique()
@@ -1007,10 +1010,84 @@ def guide():
     return render_template("guide.html")
 
 
+@app.route("/resume/<session_id>", methods=["POST"])
+def resume_grade(session_id):
+    """途中で止まったセッションを再開する"""
+    session_dir = UPLOAD_DIR / session_id
+    a_files = list(session_dir.glob("answers.*"))
+    if not a_files:
+        return jsonify({"error": "回答ファイルが見つかりません。再度アップロードしてください。"}), 404
+
+    results_dir = RESULTS_DIR / session_id
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    # 保存済みの列マッピングを読み込む（なければLMSデフォルト）
+    mapping_path = results_dir / "column_mapping.json"
+    if mapping_path.exists():
+        with open(mapping_path, encoding="utf-8") as f:
+            merged_mapping = json.load(f)
+    else:
+        merged_mapping = {
+            "a_id": "ログインID", "a_name": "名前",
+            "a_dept": "グループ", "a_genre": "属性",
+            "q_text_col": "問題文", "a_text_col": "解答", "unit_col": "ユニット",
+        }
+
+    answers_df = load_excel(a_files[0])
+    individual_dir = results_dir / "individual"
+    done_count = len(list(individual_dir.glob("*.json"))) if individual_dir.exists() else 0
+    total_count = int(answers_df[answers_df.columns[0]].dropna().nunique())
+
+    import time as _time
+    _started_at = _time.time()
+    progress_path = results_dir / "progress.json"
+    with open(progress_path, "w", encoding="utf-8") as f:
+        json.dump({
+            "status": "processing",
+            "done": done_count,
+            "total": total_count,
+            "current": f"再開中… ({done_count}人分は採点済みのためスキップ)",
+            "started_at": _started_at,
+            "now": _started_at,
+        }, f, ensure_ascii=False)
+
+    def _bg_resume(df, mapping, rdir, sid, ppath, started_at=_started_at):
+        try:
+            import importlib, grader as _gmod
+            importlib.reload(_gmod)
+            _grade_fn = _gmod.grade_tall_format
+            def cb(done, total, name):
+                import time as _t
+                with open(ppath, "w", encoding="utf-8") as fp:
+                    json.dump({"status": "processing", "done": done, "total": total,
+                               "current": name, "started_at": started_at, "now": _t.time()},
+                              fp, ensure_ascii=False)
+            results = _grade_fn(df, mapping, rdir, progress_cb=cb)
+            with open(rdir / "summary.json", "w", encoding="utf-8") as fp:
+                json.dump(results, fp, ensure_ascii=False, indent=2)
+            with open(ppath, "w", encoding="utf-8") as fp:
+                json.dump({"status": "done", "session_id": sid}, fp)
+        except Exception as e:
+            import traceback
+            with open(ppath, "w", encoding="utf-8") as fp:
+                json.dump({"status": "error", "message": str(e),
+                           "detail": traceback.format_exc()}, fp, ensure_ascii=False)
+
+    t = threading.Thread(
+        target=_bg_resume,
+        args=(answers_df, merged_mapping, results_dir, session_id, progress_path),
+        daemon=True,
+    )
+    t.start()
+    return jsonify({"session_id": session_id, "status": "processing"})
+
+
 @app.route("/sessions")
 def sessions_list():
-    """採点済みセッション一覧"""
+    """採点済み・未完了セッション一覧"""
     sessions = []
+
+    # 完了済みセッション
     for summary_path in sorted(RESULTS_DIR.glob("*/summary.json"),
                                 key=lambda p: p.stat().st_mtime, reverse=True):
         session_id = summary_path.parent.name
@@ -1029,9 +1106,54 @@ def sessions_list():
                 "count":      len(results),
                 "genres":     genres,
                 "avg_pct":    avg_pct,
+                "status":     "done",
             })
         except Exception:
             continue
+
+    # 未完了セッション（個別ファイルあり・summary.jsonなし）
+    done_ids = {s["session_id"] for s in sessions}
+    for rdir in sorted(RESULTS_DIR.iterdir(), key=lambda p: p.stat().st_mtime, reverse=True):
+        if not rdir.is_dir():
+            continue
+        sid = rdir.name
+        if sid in done_ids:
+            continue
+        ind_dir = rdir / "individual"
+        if not ind_dir.exists():
+            continue
+        ind_files = list(ind_dir.glob("*.json"))
+        if not ind_files:
+            continue
+        # 回答ファイルの有無（再開可能か）
+        can_resume = bool(list((UPLOAD_DIR / sid).glob("answers.*"))) \
+            if (UPLOAD_DIR / sid).exists() else False
+        # progress.json から状態を取得
+        prog_path = rdir / "progress.json"
+        st = "incomplete"
+        if prog_path.exists():
+            try:
+                with open(prog_path, encoding="utf-8") as f:
+                    prog = json.load(f)
+                st = prog.get("status", "incomplete")
+                if st == "done":
+                    continue  # summary.jsonが別途存在するはずなのでスキップ
+            except Exception:
+                pass
+        graded_at = datetime.datetime.fromtimestamp(
+            max(f.stat().st_mtime for f in ind_files), tz=_JST
+        ).strftime("%Y年%m月%d日 %H:%M")
+        sessions.append({
+            "session_id": sid,
+            "graded_at":  graded_at,
+            "count":      len(ind_files),
+            "genres":     [],
+            "avg_pct":    None,
+            "status":     st,
+            "can_resume": can_resume,
+        })
+
+    sessions.sort(key=lambda s: s["graded_at"], reverse=True)
     return render_template("sessions.html", sessions=sessions)
 
 
