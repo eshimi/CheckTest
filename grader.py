@@ -160,17 +160,24 @@ def build_prompt(question_text, rubrics_per_comp, answer, competencies,
     for c in competencies:
         r = rubrics_per_comp.get(c, '') if isinstance(rubrics_per_comp, dict) else rubrics_per_comp
         rubric_body = r or '（防災危機管理の専門知識と一般的な採点基準に基づいて評価してください）'
-        block = f"【{c}の採点基準】\n{rubric_body}"
-        # 採点例・注記を抽出して強調表示（ルール8の確実な適用のため）
+        # 採点例・注記を本文より前に配置（先に確認させることで確実に適用させる）
         if r:
             notes = _extract_scoring_notes(r)
-            if notes:
-                notes_text = "\n".join(f"  ・{n}" for n in notes)
-                block += (
-                    f"\n\n【★ルール8必須適用 採点例・注記（最優先）】\n"
-                    f"以下の採点例・注記に該当する回答は、他の要件より優先してその点数を付与すること：\n"
-                    f"{notes_text}"
-                )
+        else:
+            notes = []
+
+        if notes:
+            notes_text = "\n".join(f"  ・{n}" for n in notes)
+            block = (
+                f"【{c}の採点基準】\n"
+                f"▼ステップ1：まず以下の特別採点例を確認する（通常基準より最優先）\n"
+                f"{notes_text}\n"
+                f"  → 回答が上記いずれかに該当する場合は、その点数を即座に付与し、ステップ2は不要。\n\n"
+                f"▼ステップ2：上記に該当しない場合のみ、通常採点基準で評価する\n"
+                f"{rubric_body}"
+            )
+        else:
+            block = f"【{c}の採点基準】\n{rubric_body}"
         comp_blocks.append(block)
 
     comp_keys = ", ".join(f'"{c}": <0〜3の整数>' for c in competencies)
@@ -700,7 +707,7 @@ def grade_exam(questions_df, answers_df, column_mapping, results_dir):
 
 import re as _re
 
-print("=== GRADER VERSION 2026-06-02-D LOADED ===", flush=True)
+print("=== GRADER VERSION 2026-06-02-E LOADED ===", flush=True)
 
 _COMP_NAME_MAP = {
     'コミュニケーション力': 'コミュニケーション',
