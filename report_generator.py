@@ -7,6 +7,14 @@ from docx.oxml import OxmlElement
 import datetime
 
 
+def _mask_id(s):
+    """ログインIDの中間部分をアスタリスクで伏字にする（先頭3文字＋末尾2文字を残す）"""
+    s = str(s)
+    if len(s) <= 5:
+        return s[0] + '*' * (len(s) - 1)
+    return s[:3] + '*' * (len(s) - 5) + s[-2:]
+
+
 def set_cell_bg(cell, hex_color):
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
@@ -66,11 +74,11 @@ def generate_word_report(examinee: dict, output_path: str,
     # ── 受験者情報（1行） ──────────────────────────────────────────────────────
     sub = doc.add_paragraph()
     sub.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    masked = examinee["name"]
+    masked = _mask_id(examinee.get("id", examinee.get("name", "")))
     sub_run = sub.add_run(
-        f"{masked} 様　｜　グループID: {examinee.get('department', '')}　｜　"
-        f"ジャンル: {examinee.get('genre', '')}　｜　"
-        f"総合得点率: {examinee['percentage']}%　（{examinee['total_score']} / {examinee['total_max']}点）"
+        f"{masked} 様　｜　部門: {examinee.get('department', '')}　｜　"
+        f"班: {examinee.get('genre', '未設定')}　｜　"
+        f"総合得点率: {examinee['percentage']}%"
     )
     sub_run.font.size = Pt(11)
     doc.add_paragraph()

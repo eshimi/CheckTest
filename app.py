@@ -794,8 +794,7 @@ def build_overall_comment(examinee, scene_scores, comp_comments=None):
     if grow_comps:
         grow_names = "・".join(f"「{c}」" for c, _ in grow_comps[:2])
         growth_comment = (
-            f"{grow_names}については、下の評価コメントに"
-            f"具体的なヒントをまとめています。"
+            f"{grow_names}については、さらに伸ばしていける余地があります。"
             f"難しく考えず、日常の災対活動の中で「ちょっと意識してみる」くらいの感覚で"
             f"取り組んでみてください。"
             f"小さな積み重ねが、気づけば大きな力になっています。"
