@@ -53,7 +53,7 @@ SCENE_ORDER = ["シーン1", "シーン2", "シーン3"]
 
 def generate_word_report(examinee: dict, output_path: str,
                          scene_scores: dict = None, overall_comment: str = "",
-                         comp_comments: dict = None):
+                         comp_comments: dict = None, scene_comments: dict = None):
     doc = Document()
     for section in doc.sections:
         section.top_margin = Cm(2)
@@ -64,6 +64,7 @@ def generate_word_report(examinee: dict, output_path: str,
     PRIMARY = "1A3A5C"
     comp_cols = examinee.get("competency_cols", [])
     comp_comments = comp_comments or {}
+    scene_comments = scene_comments or {}
 
     # ── タイトル ──────────────────────────────────────────────────────────────
     t = doc.add_paragraph()
@@ -159,6 +160,16 @@ def generate_word_report(examinee: dict, output_path: str,
                     row.cells[2].text = f"{cb['pct']}%"
                     bg = "D4EDDA" if cb["pct"] >= 75 else ("FFF3CD" if cb["pct"] >= 50 else "F8D7DA")
                     set_cell_bg(row.cells[2], bg)
+
+            # シーン別コメント
+            scene_comment = scene_comments.get(s, "")
+            if scene_comment:
+                cp = doc.add_paragraph()
+                cp.paragraph_format.space_before = Pt(3)
+                cr = cp.add_run(scene_comment)
+                cr.font.size = Pt(9)
+                cr.font.color.rgb = RGBColor(0x44, 0x44, 0x44)
+
             doc.add_paragraph()
 
     # ── 問題別採点結果 ──────────────────────────────────────────────────────────
@@ -177,7 +188,7 @@ def generate_word_report(examinee: dict, output_path: str,
     for scene in ordered_scenes:
         scene_ans_list = answers_by_scene[scene]
         s_total = sum(sum(a.get("competency_scores", {}).values()) for a in scene_ans_list)
-        s_max = sum(len(a.get("competency_scores", {})) * 3 for a in scene_ans_list)
+        s_max = sum(len(a.get("competency_scores", {})) * 2 for a in scene_ans_list)
         s_pct = round(s_total / s_max * 100, 1) if s_max > 0 else 0
 
         sh = doc.add_heading(f"{scene}　{s_total}/{s_max}点 ({s_pct}%)", level=3)
@@ -189,7 +200,7 @@ def generate_word_report(examinee: dict, output_path: str,
             q_num += 1
             comp_scores = ans.get("competency_scores", {})
             total_q = sum(comp_scores.values())
-            max_q = len(comp_scores) * 3
+            max_q = len(comp_scores) * 2
 
             # 問タイトル
             qp = doc.add_paragraph()

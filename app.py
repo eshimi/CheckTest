@@ -1015,10 +1015,11 @@ def download_report(session_id, examinee_id):
     scene_scores = calc_scene_scores(examinee)
     comp_comments = build_comp_comments(examinee)
     overall_comment = build_overall_comment(examinee, scene_scores, comp_comments)
+    scene_comments = build_scene_comments(scene_scores)
     docx_path = RESULTS_DIR / session_id / f"report_{examinee_id}.docx"
     generate_word_report(examinee, str(docx_path),
                          scene_scores=scene_scores, overall_comment=overall_comment,
-                         comp_comments=comp_comments)
+                         comp_comments=comp_comments, scene_comments=scene_comments)
     return send_file(str(docx_path), as_attachment=True,
                      download_name=f"採点レポート_{examinee['name']}.docx",
                      mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
