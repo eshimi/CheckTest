@@ -53,7 +53,8 @@ SCENE_ORDER = ["シーン1", "シーン2", "シーン3"]
 
 def generate_word_report(examinee: dict, output_path: str,
                          scene_scores: dict = None, overall_comment: str = "",
-                         comp_comments: dict = None, scene_comments: dict = None):
+                         comp_comments: dict = None, scene_comments: dict = None,
+                         cert_level: str = "中級"):
     doc = Document()
     for section in doc.sections:
         section.top_margin = Cm(2)
@@ -82,6 +83,13 @@ def generate_word_report(examinee: dict, output_path: str,
         f"総合得点率: {examinee['percentage']}%"
     )
     sub_run.font.size = Pt(11)
+
+    cert = doc.add_paragraph()
+    cert.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    cert_run = cert.add_run(
+        f"あなたは「災害対策員　{cert_level}」に認定されました。今後の参考として評価結果をフィードバックします。"
+    )
+    cert_run.font.size = Pt(11)
     doc.add_paragraph()
 
     # ── 総評・改善提案を分割 ────────────────────────────────────────────────────

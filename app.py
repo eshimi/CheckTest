@@ -965,6 +965,17 @@ def build_scene_comments(scene_scores):
 
 SCENE_ORDER = ["シーン1", "シーン2", "シーン3"]
 
+# 上級認定者のログインID一覧
+SENIOR_IDS = {
+    "ta.kurokawa",
+    "makoto.takahashi",
+    "takuji.nishida",
+    "kazuhito.ebina",
+    "tatsuya.katayama.zr",
+    "hiromasa.kobayashi",
+    "koichi.nakayama",
+}
+
 
 @app.route("/report/<session_id>/<examinee_id>")
 def report(session_id, examinee_id):
@@ -992,6 +1003,8 @@ def report(session_id, examinee_id):
     scene_order = [s for s in SCENE_ORDER if s in answers_by_scene] + \
                   [s for s in answers_by_scene if s not in SCENE_ORDER]
 
+    cert_level = "上級" if str(examinee.get("id", "")) in SENIOR_IDS else "中級"
+
     return render_template(
         "report.html",
         examinee=examinee, session_id=session_id, now=now,
@@ -999,6 +1012,7 @@ def report(session_id, examinee_id):
         overall_comment=overall_comment, scene_comments=scene_comments,
         avg_comp_rates=avg_comp_rates, comp_comments=comp_comments,
         answers_by_scene=answers_by_scene, scene_order=scene_order,
+        cert_level=cert_level,
     )
 
 
@@ -1016,10 +1030,12 @@ def download_report(session_id, examinee_id):
     comp_comments = build_comp_comments(examinee)
     overall_comment = build_overall_comment(examinee, scene_scores, comp_comments)
     scene_comments = build_scene_comments(scene_scores)
+    cert_level = "上級" if str(examinee.get("id", "")) in SENIOR_IDS else "中級"
     docx_path = RESULTS_DIR / session_id / f"report_{examinee_id}.docx"
     generate_word_report(examinee, str(docx_path),
                          scene_scores=scene_scores, overall_comment=overall_comment,
-                         comp_comments=comp_comments, scene_comments=scene_comments)
+                         comp_comments=comp_comments, scene_comments=scene_comments,
+                         cert_level=cert_level)
     return send_file(str(docx_path), as_attachment=True,
                      download_name=f"採点レポート_{examinee['name']}.docx",
                      mimetype="application/vnd.openxmlformats-officedocument.wordprocessingml.document")
