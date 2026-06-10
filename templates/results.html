@@ -13,7 +13,12 @@
     <h2 class="fw-bold mb-0" style="color:var(--primary)"><i class="bi bi-list-check me-2"></i>採点結果一覧</h2>
     <p class="text-muted small mb-0">受験者数: {{ results|length }}名</p>
   </div>
-  <a href="/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>新しい採点</a>
+  <div class="d-flex gap-2">
+    <a href="/results/{{ session_id }}/export" class="btn btn-outline-success btn-sm">
+      <i class="bi bi-download me-1"></i>JSON エクスポート
+    </a>
+    <a href="/" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left me-1"></i>新しい採点</a>
+  </div>
 </div>
 
 <!-- 全体サマリー -->

@@ -1250,6 +1250,20 @@ def sessions_list():
     return render_template("sessions.html", sessions=sessions)
 
 
+@app.route("/results/<session_id>/export")
+def export_summary(session_id):
+    """採点結果 summary.json をダウンロードするエンドポイント"""
+    summary_path = RESULTS_DIR / session_id / "summary.json"
+    if not summary_path.exists():
+        return "結果が見つかりません", 404
+    return send_file(
+        str(summary_path),
+        as_attachment=True,
+        download_name=f"summary_{session_id[:8]}.json",
+        mimetype="application/json",
+    )
+
+
 @app.route("/results/<session_id>")
 def results_list(session_id):
     summary_path = RESULTS_DIR / session_id / "summary.json"
